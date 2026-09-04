@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Paper Ball - Online Multiplayer V1.4</title>
+  <title>Paper Ball v1.6</title>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
@@ -91,7 +91,7 @@
       background: transparent;
       padding: 0;
       color: #fff;
-      min-width: 140px;
+      min-width: 170px;
       pointer-events: none;
       z-index: 25;
       text-align: right;
@@ -108,11 +108,25 @@
       display: flex;
       justify-content: flex-end;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       margin-bottom: 5px;
       font-size: 14px;
       font-weight: bold;
       text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+    }
+    .lb-row.dead {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+    .respawn-timer-badge {
+      font-size: 11px;
+      background: rgba(255, 71, 87, 0.35);
+      border: 1px solid rgba(255, 71, 87, 0.6);
+      padding: 1px 6px;
+      border-radius: 10px;
+      color: #ff6b81;
+      text-decoration: none !important;
+      display: inline-block;
     }
 
     #speed-control-panel {
@@ -137,13 +151,12 @@
       opacity: 0.75;
     }
 
-    /* Zona extinsa: acopera toata jumatatea dreapta a ecranului */
     #touch-control-zone {
       position: absolute;
-      top: 0px;
+      top: 190px;
       right: 0px;
-      width: 55vw;
-      height: 100vh;
+      width: 60vw;
+      bottom: 0px;
       z-index: 10;
       touch-action: none;
       pointer-events: auto;
@@ -151,17 +164,18 @@
 
     #touch-joystick {
       position: absolute;
-      bottom: 30px;
-      right: 30px;
-      width: 130px;
-      height: 130px;
+      width: 135px;
+      height: 135px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.04);
-      border: 1.5px solid rgba(255, 255, 255, 0.14);
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
       display: flex;
       align-items: center;
       justify-content: center;
       pointer-events: none;
+      transition: opacity 0.15s ease-out;
+      opacity: 1;
+      z-index: 12;
     }
     .joy-arrow {
       position: absolute;
@@ -299,7 +313,6 @@
 <body>
 
   <div id="ui-container">
-    <div class="badge">Territory: <span id="score-val" style="color: #2ed573;">0%</span></div>
     <div class="badge">Kills: <span id="kills-val" style="color: #ffa502;">0</span></div>
     <button class="exit-btn" onclick="directExitGame()">Exit Game</button>
   </div>
@@ -311,29 +324,25 @@
     <div id="lb-rows"></div>
   </div>
 
-  <!-- Speed control -->
   <div id="speed-control-panel">
     <label style="font-size:10px; color:#8b949e; display:flex; justify-content:space-between;">
-      SPEED: <span id="speed-display" style="color:#58a6ff;">Lvl 4 (1.5)</span>
+      SPEED: <span id="speed-display" style="color:#58a6ff;">Lvl 4 (3.3)</span>
     </label>
     <input type="range" id="speed-slider" min="1" max="10" step="1" value="4" />
   </div>
 
-  <!-- Zona extinsa pentru toata jumatatea dreapta a ecranului -->
-  <div id="touch-control-zone">
-    <div id="touch-joystick">
-      <span class="joy-arrow joy-up">▲</span>
-      <span class="joy-arrow joy-down">▼</span>
-      <span class="joy-arrow joy-left">◀</span>
-      <span class="joy-arrow joy-right">▶</span>
-      <div id="joy-knob"></div>
-    </div>
+  <div id="touch-control-zone"></div>
+  <div id="touch-joystick">
+    <span class="joy-arrow joy-up">▲</span>
+    <span class="joy-arrow joy-down">▼</span>
+    <span class="joy-arrow joy-left">◀</span>
+    <span class="joy-arrow joy-right">▶</span>
+    <div id="joy-knob"></div>
   </div>
 
   <!-- Start Menu -->
   <div id="start-screen" class="modal-screen" style="display: flex;">
-    <h1 style="color: #58a6ff; margin-bottom: 6px;">PAPER BALL</h1>
-    <p style="color: #8b949e; margin-bottom: 20px;">V1.4 Stable Multiplayer</p>
+    <h1 style="color: #58a6ff; margin-bottom: 24px;">Paper Ball v1.6</h1>
     <input type="text" id="player-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
     
     <div class="btn-container">
@@ -391,10 +400,10 @@
     <button id="start-match-btn" class="btn-action" style="background:#0969da; margin-top: 10px;" onclick="launchMultiplayerMatch()">Start Match</button>
   </div>
 
-  <!-- Game Over Screen -->
+  <!-- Game Over Screen (Respawn strict manual) -->
   <div id="game-over-screen" class="modal-screen">
     <h1 id="death-title" style="color: #ff4757;">YOU WERE ELIMINATED!</h1>
-    <p id="death-stat">Respawning in: 5s</p>
+    <p id="death-stat">Respawn ready in: 5s</p>
     <div class="btn-container">
       <button id="revive-btn" class="btn-action" onclick="forceReviveClick()">Revive Now</button>
       <button id="restart-btn" class="btn-action" onclick="directExitGame()">Exit Game</button>
@@ -437,7 +446,6 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    const scoreVal = document.getElementById('score-val');
     const killsVal = document.getElementById('kills-val');
     const lbRows = document.getElementById('lb-rows');
     const fsBtn = document.getElementById('fs-btn');
@@ -515,7 +523,7 @@
     let keyboardTargetAngle = 0;
     let lastCamPos = { x: WORLD_SIZE / 2, y: WORLD_SIZE / 2 };
 
-    let respawnQueue = [];
+    let respawnTimers = {};
     let localRespawnCountdown = 0;
     let localCountdownTimer = null;
 
@@ -551,22 +559,52 @@
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      resetDefaultJoystickPos();
     }
     window.addEventListener('resize', resize);
 
-    // D-Pad calculat in raport cu centrul cercului din dreapta-jos, receptat pe toata jumatatea dreapta
+    function resetDefaultJoystickPos() {
+      touchJoystick.style.left = '';
+      touchJoystick.style.top = '';
+      touchJoystick.style.bottom = '25px';
+      touchJoystick.style.right = '25px';
+      touchJoystick.style.opacity = '1';
+    }
+    resetDefaultJoystickPos();
+
     let joystickActive = false;
-    function handleJoystickEvent(clientX, clientY) {
-      const rect = touchJoystick.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const dx = clientX - centerX;
-      const dy = clientY - centerY;
+    let currentJoyCenter = { x: 0, y: 0 };
+    let isCustomPlaced = false;
+
+    touchControlZone.addEventListener('pointerdown', (e) => {
+      joystickActive = true;
+      touchControlZone.setPointerCapture(e.pointerId);
+
+      const radius = 67.5;
+      currentJoyCenter = { x: e.clientX, y: e.clientY };
+
+      touchJoystick.style.bottom = '';
+      touchJoystick.style.right = '';
+      touchJoystick.style.left = (e.clientX - radius) + 'px';
+      touchJoystick.style.top = (e.clientY - radius) + 'px';
+      touchJoystick.style.opacity = '1';
+      isCustomPlaced = true;
+
+      handleJoystickMove(e.clientX, e.clientY);
+    });
+
+    touchControlZone.addEventListener('pointermove', (e) => {
+      if (joystickActive) handleJoystickMove(e.clientX, e.clientY);
+    });
+
+    function handleJoystickMove(clientX, clientY) {
+      const dx = clientX - currentJoyCenter.x;
+      const dy = clientY - currentJoyCenter.y;
       const dist = Math.hypot(dx, dy);
-      const maxKnobDistance = rect.width / 2 - 10;
+      const maxDist = 55;
 
       const angle = Math.atan2(dy, dx);
-      const clampedDist = Math.min(dist, maxKnobDistance);
+      const clampedDist = Math.min(dist, maxDist);
       const knobX = Math.cos(angle) * clampedDist;
       const knobY = Math.sin(angle) * clampedDist;
 
@@ -578,22 +616,20 @@
       }
     }
 
-    touchControlZone.addEventListener('pointerdown', (e) => {
-      joystickActive = true;
-      touchControlZone.setPointerCapture(e.pointerId);
-      handleJoystickEvent(e.clientX, e.clientY);
-    });
-    touchControlZone.addEventListener('pointermove', (e) => {
-      if (joystickActive) handleJoystickEvent(e.clientX, e.clientY);
-    });
-    touchControlZone.addEventListener('pointerup', () => {
-      joystickActive = false;
-      joyKnob.style.transform = `translate(0px, 0px)`;
-    });
-    touchControlZone.addEventListener('pointercancel', () => {
-      joystickActive = false;
-      joyKnob.style.transform = `translate(0px, 0px)`;
-    });
+    function endJoystick() {
+      if (joystickActive) {
+        joystickActive = false;
+        joyKnob.style.transform = `translate(0px, 0px)`;
+        if (isCustomPlaced) {
+          touchJoystick.style.opacity = '0';
+          setTimeout(() => {
+            if (!joystickActive) resetDefaultJoystickPos();
+          }, 180);
+        }
+      }
+    }
+    touchControlZone.addEventListener('pointerup', endJoystick);
+    touchControlZone.addEventListener('pointercancel', endJoystick);
 
     speedSlider.addEventListener('input', (e) => {
       setSpeedLevel(parseInt(e.target.value, 10));
@@ -601,7 +637,7 @@
 
     function getSpeedValueFromLevel(lvl) {
       if (lvl <= 1) return 0.0;
-      return (lvl - 1) * 0.52;
+      return ((lvl - 1) / 9) * 10.0;
     }
 
     function setSpeedLevel(lvl) {
@@ -780,7 +816,7 @@
     }
 
     function validatePlayerBaseConnection(victim, capturer) {
-      if (!victim.alive) return;
+      if (!victim || !victim.alive) return;
 
       let hasAnyTerritory = false;
       for (let i = 0; i < worldGrid.length; i++) {
@@ -792,68 +828,30 @@
 
       if (!hasAnyTerritory) {
         victim.kill(capturer, false);
-        return;
       }
+    }
 
-      if (victim.outside && victim.trail.length > 0) {
-        const originPt = worldToGrid(victim.trail[0].x, victim.trail[0].y);
-        let originStillConnected = false;
-        for (let dy = -1; dy <= 1 && !originStillConnected; dy++) {
-          for (let dx = -1; dx <= 1 && !originStillConnected; dx++) {
-            if (getCell(originPt.gx + dx, originPt.gy + dy) === victim.id) {
-              originStillConnected = true;
-            }
-          }
-        }
-
-        if (!originStillConnected) {
-          victim.kill(capturer, false);
+    function wipePlayerTerritory(playerId) {
+      for (let i = 0; i < worldGrid.length; i++) {
+        if (worldGrid[i] === playerId) {
+          worldGrid[i] = 0;
         }
       }
     }
 
-    function registerDeathInQueue(player) {
+    function updateBotAutoRespawn() {
       if (!isHost) return;
-      if (!respawnQueue.some(item => item.player.id === player.id)) {
-        respawnQueue.push({
-          player: player,
-          deathTime: Date.now(),
-          isHuman: !player.isBot,
-          canRespawnAt: Date.now() + 5000
-        });
-      }
-    }
-
-    function processRespawnQueue() {
-      if (!isHost || respawnQueue.length === 0) return;
-
       const now = Date.now();
-      respawnQueue.sort((a, b) => {
-        if (a.isHuman && !b.isHuman) return -1;
-        if (!a.isHuman && b.isHuman) return 1;
-        return a.deathTime - b.deathTime;
-      });
-
-      for (let i = 0; i < respawnQueue.length; i++) {
-        const item = respawnQueue[i];
-        if (now >= item.canRespawnAt) {
-          if (item.player.respawn()) {
-            item.player.speed = item.player.isBot ? 1.65 : getSpeedValueFromLevel(playerSpeedLevel);
-            if (!item.player.isBot && isHost && item.player.id !== myPlayerId) {
-              const guest = guestConnections.find(g => g.playerId === item.player.id);
-              if (guest && guest.conn.open) guest.conn.send({ type: 'respawn_success' });
-            } else if (item.player.id === myPlayerId) {
-              gameOverScreen.style.display = 'none';
-              isGameOver = false;
+      players.forEach(p => {
+        if (p.isBot && !p.alive && !p.isPermanentlyDead) {
+          if (respawnTimers[p.id] && now >= respawnTimers[p.id]) {
+            if (p.respawn()) {
+              delete respawnTimers[p.id];
+              broadcastTerritoryUpdate();
             }
-            respawnQueue.splice(i, 1);
-            i--;
-            broadcastTerritoryUpdate();
-          } else {
-            break;
           }
         }
-      }
+      });
     }
 
     class Character {
@@ -867,7 +865,7 @@
         this.isBot = isBot;
         this.isRemote = isRemote;
 
-        this.speed = (isBot || isRemote) ? 1.65 : getSpeedValueFromLevel(playerSpeedLevel);
+        this.speed = (isBot || isRemote) ? 2.5 : getSpeedValueFromLevel(playerSpeedLevel);
         this.radius = 16;
         this.trail = [];
         this.alive = false;
@@ -892,6 +890,7 @@
       }
 
       claimInitialZone() {
+        wipePlayerTerritory(this.id);
         const { gx, gy } = worldToGrid(this.x, this.y);
         const r = 4;
         for (let y = -r; y <= r; y++) {
@@ -902,6 +901,7 @@
       }
 
       respawn() {
+        wipePlayerTerritory(this.id);
         this.trail = [];
         this.outside = false;
         if (this.initPosition(null)) {
@@ -1097,24 +1097,20 @@
 
       kill(killer, directTrailHit = false) {
         this.alive = false;
-        const newOwner = killer ? killer.id : 0;
-        if (directTrailHit && killer && this.trail.length > 0) {
-          for (let i = 0; i < this.trail.length - 1; i++) {
-            let p1 = worldToGrid(this.trail[i].x, this.trail[i].y);
-            let p2 = worldToGrid(this.trail[i + 1].x, this.trail[i + 1].y);
-            killer.rasterLine(p1.gx, p1.gy, p2.gx, p2.gy);
-          }
-        }
         this.trail = [];
-        for (let i = 0; i < worldGrid.length; i++) {
-          if (worldGrid[i] === this.id) worldGrid[i] = newOwner;
-        }
+        wipePlayerTerritory(this.id);
 
         if (killer && killer.id === myPlayerId) {
-          playerKills++; killsVal.textContent = playerKills; sealEnclosedHoles(killer.id);
+          playerKills++; 
+          killsVal.textContent = playerKills; 
+          sealEnclosedHoles(killer.id);
         }
 
         broadcastTerritoryUpdate();
+
+        if (isHost) {
+          respawnTimers[this.id] = Date.now() + 5000;
+        }
 
         if (this.id === myPlayerId) {
           endGame();
@@ -1126,8 +1122,6 @@
             guest.conn.send({ type: 'player_eliminated' });
           }
         }
-
-        registerDeathInQueue(this);
       }
     }
 
@@ -1218,8 +1212,10 @@
             if (p) {
               const revived = p.respawn();
               c.send({ type: 'revive_result', success: revived });
-              if (revived) broadcastTerritoryUpdate();
-              else registerDeathInQueue(p);
+              if (revived) {
+                delete respawnTimers[assignedId];
+                broadcastTerritoryUpdate();
+              }
             }
           } else if (data.type === 'leave_game') {
             const p = players.find(pl => pl.id === assignedId);
@@ -1417,10 +1413,6 @@
             initGame(0);
           } else if (data.type === 'player_eliminated') {
             endGame();
-          } else if (data.type === 'respawn_success') {
-            gameOverScreen.style.display = 'none';
-            isGameOver = false;
-            clearInterval(localCountdownTimer);
           } else if (data.type === 'revive_result') {
             if (data.success) {
               gameOverScreen.style.display = 'none';
@@ -1437,6 +1429,7 @@
           } else if (data.type === 'grid_packed') {
             unpackGrid(data.data);
           } else if (data.type === 'sync') {
+            respawnTimers = data.respawnTimers || {};
             data.players.forEach(src => {
               let target = players.find(p => p.id === src.id);
               if (target) {
@@ -1495,7 +1488,7 @@
 
     function initGame(numBots = 5) {
       worldGrid.fill(0);
-      respawnQueue = [];
+      respawnTimers = {};
       gameOverScreen.style.display = 'none';
       victoryScreen.style.display = 'none';
       pauseScreen.style.display = 'none';
@@ -1536,6 +1529,7 @@
         const p = players.find(pl => pl.id === myPlayerId);
         if (p && p.respawn()) {
           p.speed = getSpeedValueFromLevel(playerSpeedLevel);
+          delete respawnTimers[myPlayerId];
           gameOverScreen.style.display = 'none';
           isGameOver = false;
           clearInterval(localCountdownTimer);
@@ -1550,18 +1544,19 @@
       isGameOver = true;
       deathTitle.textContent = "YOU WERE ELIMINATED!";
       localRespawnCountdown = 5;
-      deathStat.textContent = `Respawning in: ${localRespawnCountdown} s`;
+      deathStat.textContent = `Respawn ready in: ${localRespawnCountdown} s`;
+      reviveBtn.disabled = true;
       gameOverScreen.style.display = 'flex';
 
       clearInterval(localCountdownTimer);
       localCountdownTimer = setInterval(() => {
         localRespawnCountdown--;
         if (localRespawnCountdown > 0) {
-          deathStat.textContent = `Respawning in: ${localRespawnCountdown} s`;
+          deathStat.textContent = `Respawn ready in: ${localRespawnCountdown} s`;
         } else {
-          deathStat.textContent = "Waiting for free space...";
+          deathStat.textContent = "Click 'Revive Now' to enter match!";
+          reviveBtn.disabled = false;
           clearInterval(localCountdownTimer);
-          forceReviveClick();
         }
       }, 1000);
     }
@@ -1599,7 +1594,7 @@
       if (!isPaused && gameStarted && !isVictory) {
         if (isHost) {
           players.forEach(p => p.update());
-          processRespawnQueue();
+          updateBotAutoRespawn();
 
           const now = Date.now();
           if (now - lastNetworkSyncTime > 33) {
@@ -1607,6 +1602,7 @@
             if (guestConnections.length > 0) {
               const syncData = {
                 type: 'sync',
+                respawnTimers: respawnTimers,
                 players: players.map(p => ({
                   id: p.id, x: Math.round(p.x), y: Math.round(p.y), angle: p.angle, alive: p.alive, trail: p.trail
                 }))
@@ -1695,27 +1691,34 @@
 
       // Leaderboard
       let leaderboardData = [];
+      const nowTs = Date.now();
 
       players.forEach(p => {
         let pct = ((cellCounts[p.id] / TOTAL_ARENA_CELLS) * 100).toFixed(1);
         if (p.id === myPlayerId) {
-          scoreVal.textContent = pct + "%";
           if (parseFloat(pct) >= 100.0 && !isVictory && !isGameOver) {
             triggerVictory("You conquered 100% of the arena!");
           }
         }
 
+        let respawnSec = 0;
+        if (!p.alive && respawnTimers[p.id]) {
+          respawnSec = Math.max(0, Math.ceil((respawnTimers[p.id] - nowTs) / 1000));
+        }
+
         leaderboardData.push({
-          name: p.name + (!p.alive ? " (Dead)" : ""),
+          name: p.name,
           score: parseFloat(pct),
           color: p.zoneColor,
-          alive: p.alive
+          alive: p.alive,
+          respawnSec: respawnSec
         });
       });
 
       leaderboardData.sort((a, b) => b.score - a.score);
       lbRows.innerHTML = leaderboardData.map(d => `
-        <div class="lb-row" style="color:${d.alive ? d.color : '#6e7681'}">
+        <div class="lb-row ${!d.alive ? 'dead' : ''}" style="color:${d.alive ? d.color : '#8b949e'}">
+          ${!d.alive && d.respawnSec > 0 ? `<span class="respawn-timer-badge">${d.respawnSec}s</span>` : ''}
           <span>${d.name}</span>
           <span>${d.score}%</span>
         </div>
