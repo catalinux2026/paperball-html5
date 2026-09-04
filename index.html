@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Paper Ball - Online Multiplayer V2.8</title>
+  <title>Paper Ball - Online Multiplayer V2.9</title>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
@@ -34,8 +34,8 @@
       z-index: 5;
     }
     .badge {
-      background: rgba(13, 17, 23, 0.85);
-      backdrop-filter: blur(8px);
+      background: rgba(13, 17, 23, 0.75);
+      backdrop-filter: blur(6px);
       padding: 8px 16px;
       border-radius: 20px;
       color: #fff;
@@ -48,7 +48,7 @@
     }
     .exit-btn {
       background: rgba(218, 54, 51, 0.85);
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(6px);
       padding: 8px 16px;
       border-radius: 20px;
       color: #fff;
@@ -71,8 +71,8 @@
       right: 20px;
       width: 38px;
       height: 38px;
-      background: rgba(13, 17, 23, 0.85);
-      backdrop-filter: blur(8px);
+      background: rgba(13, 17, 23, 0.75);
+      backdrop-filter: blur(6px);
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 8px;
       color: #fff;
@@ -110,21 +110,68 @@
       font-weight: bold;
       text-shadow: 0 2px 4px rgba(0,0,0,0.9);
     }
+
+    /* Cadran viteză semi-transparent mutat în stânga jos */
     #speed-control-panel {
       position: absolute;
-      bottom: 20px;
-      right: 20px;
-      background: rgba(13, 17, 23, 0.85);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 12px;
-      padding: 10px 16px;
+      bottom: 12px;
+      left: 20px;
+      background: rgba(13, 17, 23, 0.35);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 6px 12px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
       color: #fff;
       z-index: 10;
     }
-    #speed-slider { width: 140px; cursor: pointer; }
+    #speed-slider { 
+      width: 130px; 
+      cursor: pointer; 
+      accent-color: #58a6ff;
+      opacity: 0.75;
+    }
+
+    /* Joystick tactil discret în dreapta jos */
+    #touch-joystick {
+      position: absolute;
+      bottom: 25px;
+      right: 25px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 12;
+      touch-action: none;
+      pointer-events: auto;
+    }
+    .joy-arrow {
+      position: absolute;
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 16px;
+      font-weight: bold;
+      pointer-events: none;
+    }
+    .joy-up { top: 6px; }
+    .joy-down { bottom: 6px; }
+    .joy-left { left: 8px; }
+    .joy-right { right: 8px; }
+    #joy-knob {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(88, 166, 255, 0.25);
+      border: 1px solid rgba(88, 166, 255, 0.5);
+      pointer-events: none;
+      transform: translate(0px, 0px);
+      transition: transform 0.05s ease-out;
+    }
 
     .modal-screen {
       position: absolute;
@@ -158,7 +205,7 @@
       border-radius: 30px;
       cursor: pointer;
       box-shadow: 0 8px 20px rgba(0,0,0,0.6);
-      transition: transform 0.15s ease, background-color 0.2s ease;
+      transition: transform 0.15s ease;
     }
     .btn-action:hover:not(:disabled) { transform: scale(1.05); }
     .btn-action:disabled {
@@ -167,7 +214,6 @@
       opacity: 0.6;
       cursor: not-allowed;
       transform: none !important;
-      box-shadow: none;
     }
     #start-btn, #host-btn, #join-btn, #manual-join-btn { background: #0969da; }
     #revive-btn { background: #238636; }
@@ -244,7 +290,7 @@
   <div id="ui-container">
     <div class="badge">Territory: <span id="score-val" style="color: #2ed573;">0%</span></div>
     <div class="badge">Kills: <span id="kills-val" style="color: #ffa502;">0</span></div>
-    <button class="exit-btn" onclick="confirmExitGame()">Exit Game</button>
+    <button class="exit-btn" onclick="directExitGame()">Exit Game</button>
   </div>
 
   <button id="fs-btn" onclick="toggleFullscreen()">⛶</button>
@@ -254,17 +300,27 @@
     <div id="lb-rows"></div>
   </div>
 
+  <!-- Cadran viteză în stânga jos sub minimap -->
   <div id="speed-control-panel">
-    <label style="font-size:11px; color:#8b949e; display:flex; justify-content:space-between;">
-      SPEED: <span id="speed-display" style="color:#58a6ff;">4.0</span>
+    <label style="font-size:10px; color:#8b949e; display:flex; justify-content:space-between;">
+      SPEED: <span id="speed-display" style="color:#58a6ff;">3.0</span>
     </label>
     <input type="range" id="speed-slider" min="1.0" max="15.0" step="0.5" value="4.0" />
+  </div>
+
+  <!-- Joystick discret în dreapta jos -->
+  <div id="touch-joystick">
+    <span class="joy-arrow joy-up">▲</span>
+    <span class="joy-arrow joy-down">▼</span>
+    <span class="joy-arrow joy-left">◀</span>
+    <span class="joy-arrow joy-right">▶</span>
+    <div id="joy-knob"></div>
   </div>
 
   <!-- Start Menu -->
   <div id="start-screen" class="modal-screen" style="display: flex;">
     <h1 style="color: #58a6ff; margin-bottom: 6px;">PAPER BALL</h1>
-    <p style="color: #8b949e; margin-bottom: 20px;">Play Solo vs AI or Host up to 6 Players Online</p>
+    <p style="color: #8b949e; margin-bottom: 20px;">Solo vs AI or Multi-Device Online V2.9</p>
     <input type="text" id="player-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
     
     <div class="btn-container">
@@ -274,11 +330,11 @@
     </div>
   </div>
 
-  <!-- Manual Join Lobby -->
+  <!-- Manual Join Lobby (Camera implicita 'main' pentru lobby fix) -->
   <div id="manual-join-screen" class="modal-screen">
     <h1 style="color: #8250df; margin-bottom: 6px;">JOIN LOBBY</h1>
-    <p style="color: #8b949e; margin-bottom: 16px;">Enter Room Code (e.g. 4821 or pb-4821):</p>
-    <input type="text" id="manual-room-input" class="input-field" maxlength="12" placeholder="Room Code..." />
+    <p style="color: #8b949e; margin-bottom: 16px;">Fixed Room: <b>main</b> or custom code:</p>
+    <input type="text" id="manual-room-input" class="input-field" maxlength="16" value="main" placeholder="Room Code..." />
     <input type="text" id="manual-nick-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
     <div class="btn-container">
       <button id="manual-submit-btn" class="btn-action" style="background:#8250df;" onclick="submitManualJoin()">Connect</button>
@@ -287,7 +343,7 @@
     <p id="manual-status-msg" style="margin-top:14px; font-size:14px; color:#cbd5e1;"></p>
   </div>
 
-  <!-- Guest Join Screen (dupa QR sau Link) -->
+  <!-- Guest Join Screen -->
   <div id="guest-join-screen" class="modal-screen">
     <h1 style="color: #58a6ff; margin-bottom: 6px;">JOIN ROOM</h1>
     <p style="color: #8b949e; margin-bottom: 18px;">Choose your player nickname:</p>
@@ -296,10 +352,10 @@
     <p id="guest-status-msg" style="margin-top:14px; font-size:14px; color:#cbd5e1;"></p>
   </div>
 
-  <!-- Lobby Host (Pana la 6 jucatori) -->
+  <!-- Lobby Host -->
   <div id="lobby-screen" class="modal-screen">
     <h1 style="color: #2ed573; margin-bottom: 4px; font-size: 32px;">ONLINE ROOM</h1>
-    <p style="margin-bottom: 8px; font-size: 14px; color:#94a3b8;">Scan or share code (Up to 6 players):</p>
+    <p style="margin-bottom: 8px; font-size: 14px; color:#94a3b8;">Room ID: <b id="display-room-code" style="color:#58a6ff;">main</b></p>
     <div id="lobby-qr-container"></div>
     <div id="room-link-text">Generating link...</div>
 
@@ -310,7 +366,6 @@
         <option value="1">1 Bot</option>
         <option value="2">2 Bots</option>
         <option value="3">3 Bots</option>
-        <option value="4">4 Bots</option>
       </select>
     </div>
 
@@ -327,7 +382,7 @@
     <p id="death-stat">You captured 0% of the arena</p>
     <div class="btn-container">
       <button id="revive-btn" class="btn-action" onclick="revivePlayer()">Revive</button>
-      <button id="restart-btn" class="btn-action" onclick="confirmExitGame()">Exit Game</button>
+      <button id="restart-btn" class="btn-action" onclick="directExitGame()">Exit Game</button>
     </div>
   </div>
 
@@ -337,7 +392,7 @@
     <p id="victory-stat">You conquered the arena!</p>
     <div class="btn-container">
       <button id="rematch-btn" class="btn-action" onclick="requestRematch()">Request Rematch</button>
-      <button class="btn-action" style="background:#da3633;" onclick="confirmExitGame()">Exit Game</button>
+      <button class="btn-action" style="background:#da3633;" onclick="directExitGame()">Exit Game</button>
     </div>
   </div>
 
@@ -357,7 +412,7 @@
     <p>Press <b>ESC</b> or click below to resume</p>
     <div class="btn-container">
       <button class="btn-action" style="background:#0969da;" onclick="togglePause()">Resume Game</button>
-      <button class="btn-action" style="background:#da3633;" onclick="confirmExitGame()">Exit Game</button>
+      <button class="btn-action" style="background:#da3633;" onclick="directExitGame()">Exit Game</button>
     </div>
   </div>
 
@@ -398,6 +453,9 @@
     const botSelect = document.getElementById('bot-count-select');
     const playerListDiv = document.getElementById('player-list');
     const hostNameTag = document.getElementById('host-name-tag');
+    const touchJoystick = document.getElementById('touch-joystick');
+    const joyKnob = document.getElementById('joy-knob');
+    const displayRoomCode = document.getElementById('display-room-code');
 
     const WORLD_SIZE = 2600;
     const GRID_RES = 160; 
@@ -417,7 +475,6 @@
 
     let playerName = sessionStorage.getItem('paperball_player_name') || "";
 
-    // Paleta extinsa pana la 6 jucatori
     const PALETTE = [
       { id: 1, name: "Player 1", zone: "#00b4d8", head: "#03045e", border: "#ffffff", trail: "rgba(0, 180, 216, 0.75)" },
       { id: 2, name: "Player 2", zone: "#ff6b81", head: "#800020", border: "#ffffff", trail: "rgba(255, 107, 129, 0.75)" },
@@ -446,11 +503,12 @@
     let peer = null;
     let isHost = true;
     let myPlayerId = 1;
-    let guestConnections = []; // Max 5 guests (1 host + 5 guests = 6 jucatori)
+    let guestConnections = []; 
     let hostConn = null;
     let pendingJoinRoomId = null;
     let rematchTimeoutTimer = null;
-    let isConnecting = false; // Protectie anti-double join
+    let isConnecting = false;
+    let lastNetworkSyncTime = 0;
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -458,6 +516,7 @@
     }
     window.addEventListener('resize', resize);
 
+    // Mouse / Touch orientare
     window.addEventListener('mousemove', (e) => {
       inputMode = 'mouse';
       mousePos.x = e.clientX;
@@ -465,27 +524,74 @@
     });
 
     window.addEventListener('touchmove', (e) => {
-      if (e.touches.length > 0) {
+      if (e.touches.length > 0 && !joystickActive) {
         inputMode = 'mouse';
         mousePos.x = e.touches[0].clientX;
         mousePos.y = e.touches[0].clientY;
       }
     }, { passive: false });
 
+    // Configurare Joystick tactil discret (Dreapta Jos)
+    let joystickActive = false;
+    function handleJoystickEvent(clientX, clientY) {
+      const rect = touchJoystick.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = clientX - centerX;
+      const dy = clientY - centerY;
+      const dist = Math.hypot(dx, dy);
+      const maxRadius = rect.width / 2 - 10;
+
+      const angle = Math.atan2(dy, dx);
+      const clampedDist = Math.min(dist, maxRadius);
+      const knobX = Math.cos(angle) * clampedDist;
+      const knobY = Math.sin(angle) * clampedDist;
+
+      joyKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+
+      inputMode = 'keyboard';
+      keyboardTargetAngle = angle;
+
+      if (!isHost && hostConn && hostConn.open) {
+        hostConn.send({ type: 'input', angle: angle });
+      }
+    }
+
+    touchJoystick.addEventListener('pointerdown', (e) => {
+      joystickActive = true;
+      handleJoystickEvent(e.clientX, e.clientY);
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (joystickActive) handleJoystickEvent(e.clientX, e.clientY);
+    });
+    window.addEventListener('pointerup', () => {
+      if (joystickActive) {
+        joystickActive = false;
+        joyKnob.style.transform = `translate(0px, 0px)`;
+      }
+    });
+
+    // Calibrare viteză: 1.0 = 0 (Stop complet), 15.0 = Max
     speedSlider.addEventListener('input', (e) => {
       setSpeedValue(parseFloat(e.target.value));
     });
 
+    function getActualSpeed(settingVal) {
+      if (settingVal <= 1.05) return 0.0; // Viteza 1 sta pe loc
+      return (settingVal - 1.0) * 0.55; 
+    }
+
     function setSpeedValue(val) {
       playerSpeedSetting = Math.max(1.0, Math.min(15.0, val));
       speedSlider.value = playerSpeedSetting;
-      speedDisplay.textContent = playerSpeedSetting.toFixed(1);
+      const actual = getActualSpeed(playerSpeedSetting);
+      speedDisplay.textContent = actual === 0 ? "0.0 (STOP)" : actual.toFixed(1);
 
       if (isHost) {
         const p = players.find(pl => pl.id === myPlayerId);
-        if (p) p.speed = playerSpeedSetting;
+        if (p) p.speed = actual;
       } else if (hostConn && hostConn.open) {
-        hostConn.send({ type: 'set_speed', speed: playerSpeedSetting });
+        hostConn.send({ type: 'set_speed', speed: actual });
       }
     }
 
@@ -513,7 +619,11 @@
       else if (key === 's' || key === 'arrowdown') newAngle = Math.PI / 2;
       else if (key === 'a' || key === 'arrowleft') newAngle = Math.PI;
       else if (key === 'd' || key === 'arrowright') newAngle = 0;
-      if (newAngle !== null) { inputMode = 'keyboard'; keyboardTargetAngle = newAngle; }
+      if (newAngle !== null) { 
+        inputMode = 'keyboard'; 
+        keyboardTargetAngle = newAngle; 
+        if (!isHost && hostConn && hostConn.open) hostConn.send({ type: 'input', angle: newAngle });
+      }
     });
 
     function toggleFullscreen() {
@@ -526,13 +636,12 @@
       pauseScreen.style.display = isPaused ? 'flex' : 'none';
     }
 
-    function confirmExitGame() {
-      if (confirm("Are you sure you want to exit the match?")) {
-        if (!isHost && hostConn && hostConn.open) {
-          hostConn.send({ type: 'leave_game', playerId: myPlayerId });
-        }
-        window.location.href = window.location.origin + window.location.pathname;
+    // Ieșire directă fără pop-up
+    function directExitGame() {
+      if (!isHost && hostConn && hostConn.open) {
+        hostConn.send({ type: 'leave_game', playerId: myPlayerId });
       }
+      window.location.href = window.location.origin + window.location.pathname;
     }
 
     function getCell(gx, gy) {
@@ -618,7 +727,7 @@
       }
     }
 
-    function pruneDisconnectedTerritory(ownerId, targetX, targetY, isOutside) {
+    function pruneDisconnectedTerritory(ownerId, targetX, targetY) {
       let visited = new Uint8Array(GRID_RES * GRID_RES);
       const { gx, gy } = worldToGrid(targetX, targetY);
       let queue = [];
@@ -693,7 +802,7 @@
         this.isBot = isBot;
         this.isRemote = isRemote;
 
-        this.speed = (isBot || isRemote) ? 4.0 : playerSpeedSetting;
+        this.speed = (isBot || isRemote) ? 1.65 : getActualSpeed(playerSpeedSetting);
         this.radius = 16;
         this.trail = [];
         this.alive = false;
@@ -749,6 +858,7 @@
           return;
         }
 
+        // Doar caracterul propriu local este ghidat de mouse / joystick
         if (this.id === myPlayerId && !this.isRemote && !this.isBot) {
           let target = this.angle;
           if (inputMode === 'mouse') {
@@ -764,30 +874,32 @@
           this.updateBotAI();
         }
 
-        this.x += Math.cos(this.angle) * this.speed;
-        this.y += Math.sin(this.angle) * this.speed;
+        if (this.speed > 0) {
+          this.x += Math.cos(this.angle) * this.speed;
+          this.y += Math.sin(this.angle) * this.speed;
 
-        const dx = this.x - WORLD_SIZE / 2, dy = this.y - WORLD_SIZE / 2;
-        const dist = Math.hypot(dx, dy);
-        if (dist > WORLD_RADIUS - this.radius) {
-          this.x = WORLD_SIZE / 2 + (dx / dist) * (WORLD_RADIUS - this.radius);
-          this.y = WORLD_SIZE / 2 + (dy / dist) * (WORLD_RADIUS - this.radius);
-        }
-
-        const { gx, gy } = worldToGrid(this.x, this.y);
-        const curOwner = getCell(gx, gy);
-
-        if (curOwner !== this.id) {
-          this.outside = true;
-          const last = this.trail[this.trail.length - 1];
-          if (!last || Math.hypot(this.x - last.x, this.y - last.y) > 4) {
-            this.trail.push({ x: this.x, y: this.y });
+          const dx = this.x - WORLD_SIZE / 2, dy = this.y - WORLD_SIZE / 2;
+          const dist = Math.hypot(dx, dy);
+          if (dist > WORLD_RADIUS - this.radius) {
+            this.x = WORLD_SIZE / 2 + (dx / dist) * (WORLD_RADIUS - this.radius);
+            this.y = WORLD_SIZE / 2 + (dy / dist) * (WORLD_RADIUS - this.radius);
           }
-        } else if (this.outside) {
-          this.outside = false;
-          this.trail.push({ x: this.x, y: this.y });
-          this.capturePolygon();
-          this.trail = [];
+
+          const { gx, gy } = worldToGrid(this.x, this.y);
+          const curOwner = getCell(gx, gy);
+
+          if (curOwner !== this.id) {
+            this.outside = true;
+            const last = this.trail[this.trail.length - 1];
+            if (!last || Math.hypot(this.x - last.x, this.y - last.y) > 4) {
+              this.trail.push({ x: this.x, y: this.y });
+            }
+          } else if (this.outside) {
+            this.outside = false;
+            this.trail.push({ x: this.x, y: this.y });
+            this.capturePolygon();
+            this.trail = [];
+          }
         }
 
         players.forEach(p => {
@@ -908,7 +1020,7 @@
         affectedVictims.forEach(vId => {
           const victim = players.find(p => p.id === vId);
           if (victim && victim.alive) {
-            pruneDisconnectedTerritory(vId, victim.x, victim.y, victim.outside);
+            pruneDisconnectedTerritory(vId, victim.x, victim.y);
             validatePlayerBaseConnection(victim, this);
           }
         });
@@ -1002,6 +1114,7 @@
       }
     }
 
+    // Gestionare Host (Lobby Fix)
     function openHostLobby() {
       saveNick();
       isHost = true;
@@ -1009,8 +1122,10 @@
       lobbyScreen.style.display = 'flex';
       hostNameTag.textContent = playerName;
 
-      const roomId = "pb-" + Math.floor(1000 + Math.random() * 9000);
-      peer = new Peer(roomId);
+      // Lobby fix cu prefix 'pb-main' pentru a fi mereu aceeași cameră
+      const fixedRoomCode = "pb-main";
+      displayRoomCode.textContent = "main";
+      peer = new Peer(fixedRoomCode);
 
       peer.on('open', (id) => {
         const joinUrl = window.location.origin + window.location.pathname + "?join=" + id;
@@ -1019,15 +1134,18 @@
         new QRCode(document.getElementById('lobby-qr-container'), { text: joinUrl, width: 140, height: 140 });
       });
 
-      peer.on('connection', (c) => {
-        // Ignora reconectarile duplicate de la acelasi browser
-        if (guestConnections.some(g => g.conn.peer === c.peer)) return;
-        
-        // Limita extinsa: Max 5 oaspeti (6 jucatori total)
-        if (guestConnections.length >= 5) { 
-          c.close(); 
-          return; 
+      peer.on('error', (err) => {
+        // Daca 'pb-main' e ocupat de o instanta veche, genereaza fallback
+        if (err.type === 'unavailable-id') {
+          const fallback = "pb-" + Math.floor(1000 + Math.random() * 9000);
+          displayRoomCode.textContent = fallback.replace('pb-', '');
+          peer = new Peer(fallback);
         }
+      });
+
+      peer.on('connection', (c) => {
+        if (guestConnections.some(g => g.conn.peer === c.peer)) return;
+        if (guestConnections.length >= 5) { c.close(); return; }
 
         const assignedId = guestConnections.length + 2;
         const guestObj = { conn: c, playerId: assignedId, name: "Player " + assignedId, rematchAccepted: false };
@@ -1089,8 +1207,11 @@
       const numBots = parseInt(botSelect.value, 10);
       initGame(numBots);
 
+      // Fiecare jucător primește pachetul de start cu propriul său playerId garantat
       guestConnections.forEach(g => {
-        if (g.conn.open) g.conn.send({ type: 'start', playerId: g.playerId, palette: PALETTE });
+        if (g.conn.open) {
+          g.conn.send({ type: 'start', playerId: g.playerId, palette: PALETTE });
+        }
       });
       broadcastTerritoryUpdate();
     }
@@ -1114,7 +1235,7 @@
           guestConnections.forEach(g => {
             if (g.conn.open) g.conn.send({ type: 'rematch_timeout' });
           });
-          window.location.href = window.location.origin + window.location.pathname;
+          directExitGame();
         }
       }, 10000);
     }
@@ -1124,7 +1245,7 @@
       if (allAccepted && guestConnections.length > 0) {
         if (rematchTimeoutTimer) clearTimeout(rematchTimeoutTimer);
         guestConnections.forEach(g => {
-          if (g.conn.open) g.conn.send({ type: 'start_rematch' });
+          if (g.conn.open) g.conn.send({ type: 'start_rematch', playerId: g.playerId });
         });
         resetGameForRematch();
       }
@@ -1144,7 +1265,7 @@
       if (accept) {
         if (hostConn && hostConn.open) hostConn.send({ type: 'rematch_response', accept: true });
       } else {
-        confirmExitGame();
+        directExitGame();
       }
     }
 
@@ -1164,10 +1285,10 @@
     }
 
     function submitManualJoin() {
-      if (isConnecting) return; // Blocare click dublu
+      if (isConnecting) return;
 
       let code = manualRoomInput.value.trim();
-      if (!code) return;
+      if (!code) code = "main";
       if (!code.startsWith("pb-")) code = "pb-" + code;
       const nick = manualNickInput.value.trim() || "Guest";
       playerName = nick;
@@ -1176,7 +1297,7 @@
       isConnecting = true;
       manualSubmitBtn.disabled = true;
       manualSubmitBtn.textContent = "Connecting...";
-      manualStatusMsg.textContent = "Connecting to room " + code + "...";
+      manualStatusMsg.textContent = "Connecting to room " + code.replace("pb-", "") + "...";
 
       connectAsGuest(code, manualStatusMsg, manualJoinScreen, manualSubmitBtn);
     }
@@ -1193,7 +1314,7 @@
     }
 
     function confirmGuestJoin() {
-      if (isConnecting) return; // Blocare click dublu
+      if (isConnecting) return;
 
       const nick = guestNickInput.value.trim() || "Guest";
       playerName = nick;
@@ -1244,18 +1365,18 @@
             rematchMsg.textContent = `${data.winner} wants a Rematch! (10s timeout)`;
             rematchPopup.style.display = 'flex';
           } else if (data.type === 'rematch_timeout') {
-            alert("Rematch request timed out. Returning to main menu.");
-            window.location.href = window.location.origin + window.location.pathname;
+            directExitGame();
           } else if (data.type === 'force_victory') {
             triggerVictory(data.msg || "Opponent left the match! You won!");
           } else if (data.type === 'grid_packed') {
             unpackGrid(data.data);
           } else if (data.type === 'sync') {
+            // Interpolare poziții pentru a elimina sacadarea
             data.players.forEach(src => {
               let target = players.find(p => p.id === src.id);
               if (target) {
-                target.x = src.x;
-                target.y = src.y;
+                target.x += (src.x - target.x) * 0.45;
+                target.y += (src.y - target.y) * 0.45;
                 target.angle = src.angle;
                 target.alive = src.alive;
                 target.trail = src.trail;
@@ -1273,16 +1394,20 @@
           isConnecting = false;
         });
 
+        // Transmisie continuă fără suprasolicitare
         setInterval(() => {
           if (hostConn && hostConn.open && gameStarted && !isGameOver) {
-            const angle = Math.atan2(mousePos.y - canvas.height / 2, mousePos.x - canvas.width / 2);
-            hostConn.send({ type: 'input', angle: angle });
+            let sendAngle = keyboardTargetAngle;
+            if (inputMode === 'mouse') {
+              sendAngle = Math.atan2(mousePos.y - canvas.height / 2, mousePos.x - canvas.width / 2);
+            }
+            hostConn.send({ type: 'input', angle: sendAngle });
           }
-        }, 1000 / 25);
+        }, 1000 / 30);
       });
 
-      peer.on('error', (err) => {
-        statusElement.textContent = "Connection error. Check room code.";
+      peer.on('error', () => {
+        statusElement.textContent = "Connection error. Ensure Host created the lobby.";
         if (buttonElement) {
           buttonElement.disabled = false;
           buttonElement.textContent = "Retry";
@@ -1322,8 +1447,7 @@
       const initialSpawnRadius = 750;
       players = [];
 
-      // Total participanti: Host (1) + Invitati conectati + Boti (pana la 6 maxim)
-      const activeHumanCount = isHost ? (1 + guestConnections.length) : 2;
+      const activeHumanCount = isHost ? (1 + guestConnections.length) : 3;
       const totalCount = Math.min(6, activeHumanCount + numBots);
 
       for (let i = 0; i < totalCount; i++) {
@@ -1340,14 +1464,14 @@
       }
       
       const myChar = players.find(p => p.id === myPlayerId);
-      if (myChar) myChar.speed = playerSpeedSetting;
+      if (myChar) myChar.speed = getActualSpeed(playerSpeedSetting);
     }
 
     function revivePlayer() {
       if (isHost) {
         const p = players.find(pl => pl.id === myPlayerId);
         if (p && p.respawn()) {
-          p.speed = playerSpeedSetting;
+          p.speed = getActualSpeed(playerSpeedSetting);
           gameOverScreen.style.display = 'none';
           isGameOver = false;
           broadcastTerritoryUpdate();
@@ -1402,32 +1526,21 @@
         if (isHost) {
           players.forEach(p => p.update());
 
-          if (Date.now() - matchStartTime > 8000) {
-            let safeSpotAvailable = (findSafeSpawnPoint() !== null);
-            let anyBotAlive = players.some(p => p.isBot && p.alive);
-            let anyGuestAlive = guestConnections.some(g => {
-              let gp = players.find(pl => pl.id === g.playerId);
-              return gp && gp.alive;
-            });
-
-            if (!safeSpotAvailable && !anyBotAlive && !anyGuestAlive) {
-              let me = players.find(p => p.id === myPlayerId);
-              if (me && me.alive) {
-                triggerVictory("No safe space left for opponents! You won!");
-              }
+          // Sincronizare optimizată 30Hz pentru eliminarea sacadării
+          const now = Date.now();
+          if (now - lastNetworkSyncTime > 33) {
+            lastNetworkSyncTime = now;
+            if (guestConnections.length > 0) {
+              const syncData = {
+                type: 'sync',
+                players: players.map(p => ({
+                  id: p.id, x: Math.round(p.x), y: Math.round(p.y), angle: p.angle, alive: p.alive, trail: p.trail
+                }))
+              };
+              guestConnections.forEach(g => {
+                if (g.conn.open) g.conn.send(syncData);
+              });
             }
-          }
-
-          if (guestConnections.length > 0) {
-            const syncData = {
-              type: 'sync',
-              players: players.map(p => ({
-                id: p.id, x: p.x, y: p.y, angle: p.angle, alive: p.alive, trail: p.trail
-              }))
-            };
-            guestConnections.forEach(g => {
-              if (g.conn.open) g.conn.send(syncData);
-            });
           }
         } else {
           const myChar = players.find(p => p.id === myPlayerId);
@@ -1435,6 +1548,7 @@
         }
       }
 
+      // Camera personalizată strict pe propriul caracter
       const localChar = players.find(p => p.id === myPlayerId) || players[0];
       if (localChar && localChar.alive && !isNaN(localChar.x) && !isNaN(localChar.y)) {
         lastCamPos.x = localChar.x;
@@ -1538,16 +1652,17 @@
     }
 
     function drawMinimap() {
-      const mapSize = 156, margin = 20;
+      const mapSize = 135, margin = 20;
       ctx.save();
-      ctx.translate(margin, canvas.height - mapSize - margin);
+      // Minimap poziționat deasupra cadranului de viteză
+      ctx.translate(margin, canvas.height - mapSize - 60);
 
       ctx.beginPath();
       ctx.arc(mapSize / 2, mapSize / 2, mapSize / 2, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(13, 17, 23, 0.9)";
+      ctx.fillStyle = "rgba(13, 17, 23, 0.75)";
       ctx.fill();
       ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2;
       ctx.stroke();
       ctx.clip();
 
