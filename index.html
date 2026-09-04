@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Paper Ball - Online Multiplayer V2.7</title>
+  <title>Paper Ball - Online Multiplayer V2.8</title>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
@@ -158,10 +158,17 @@
       border-radius: 30px;
       cursor: pointer;
       box-shadow: 0 8px 20px rgba(0,0,0,0.6);
-      transition: transform 0.15s ease;
+      transition: transform 0.15s ease, background-color 0.2s ease;
     }
-    .btn-action:hover { transform: scale(1.05); }
-    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-action:hover:not(:disabled) { transform: scale(1.05); }
+    .btn-action:disabled {
+      background: #484f58 !important;
+      color: #8b949e !important;
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none;
+    }
     #start-btn, #host-btn, #join-btn, #manual-join-btn { background: #0969da; }
     #revive-btn { background: #238636; }
     #restart-btn { background: #da3633; }
@@ -217,7 +224,9 @@
       flex-direction: column;
       gap: 6px;
       margin-bottom: 16px;
-      min-width: 260px;
+      min-width: 280px;
+      max-height: 220px;
+      overflow-y: auto;
     }
     .player-slot {
       background: rgba(255,255,255,0.06);
@@ -255,7 +264,7 @@
   <!-- Start Menu -->
   <div id="start-screen" class="modal-screen" style="display: flex;">
     <h1 style="color: #58a6ff; margin-bottom: 6px;">PAPER BALL</h1>
-    <p style="color: #8b949e; margin-bottom: 20px;">Solo vs AI or Multi-Device Online V2.7</p>
+    <p style="color: #8b949e; margin-bottom: 20px;">Play Solo vs AI or Host up to 6 Players Online</p>
     <input type="text" id="player-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
     
     <div class="btn-container">
@@ -272,13 +281,13 @@
     <input type="text" id="manual-room-input" class="input-field" maxlength="12" placeholder="Room Code..." />
     <input type="text" id="manual-nick-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
     <div class="btn-container">
-      <button class="btn-action" style="background:#8250df;" onclick="submitManualJoin()">Connect</button>
+      <button id="manual-submit-btn" class="btn-action" style="background:#8250df;" onclick="submitManualJoin()">Connect</button>
       <button class="btn-action" style="background:#da3633;" onclick="backToMainMenu()">Back</button>
     </div>
     <p id="manual-status-msg" style="margin-top:14px; font-size:14px; color:#cbd5e1;"></p>
   </div>
 
-  <!-- Guest Join Screen -->
+  <!-- Guest Join Screen (dupa QR sau Link) -->
   <div id="guest-join-screen" class="modal-screen">
     <h1 style="color: #58a6ff; margin-bottom: 6px;">JOIN ROOM</h1>
     <p style="color: #8b949e; margin-bottom: 18px;">Choose your player nickname:</p>
@@ -287,21 +296,21 @@
     <p id="guest-status-msg" style="margin-top:14px; font-size:14px; color:#cbd5e1;"></p>
   </div>
 
-  <!-- Lobby Host -->
+  <!-- Lobby Host (Pana la 6 jucatori) -->
   <div id="lobby-screen" class="modal-screen">
     <h1 style="color: #2ed573; margin-bottom: 4px; font-size: 32px;">ONLINE ROOM</h1>
-    <p style="margin-bottom: 8px; font-size: 14px; color:#94a3b8;">Scan with phone camera or use code to connect:</p>
+    <p style="margin-bottom: 8px; font-size: 14px; color:#94a3b8;">Scan or share code (Up to 6 players):</p>
     <div id="lobby-qr-container"></div>
     <div id="room-link-text">Generating link...</div>
 
     <div class="config-box">
       <span>AI Bots:</span>
       <select id="bot-count-select" class="config-select">
-        <option value="4">4 Bots</option>
-        <option value="3">3 Bots</option>
-        <option value="2">2 Bots</option>
-        <option value="1">1 Bot</option>
         <option value="0" selected>0 Bots (Players Only)</option>
+        <option value="1">1 Bot</option>
+        <option value="2">2 Bots</option>
+        <option value="3">3 Bots</option>
+        <option value="4">4 Bots</option>
       </select>
     </div>
 
@@ -309,7 +318,7 @@
       <div class="player-slot" style="color: #00b4d8;">1. Host <span id="host-name-tag">Ready</span></div>
     </div>
 
-    <button class="btn-action" style="background:#0969da; margin-top: 10px;" onclick="launchMultiplayerMatch()">Start Match</button>
+    <button id="start-match-btn" class="btn-action" style="background:#0969da; margin-top: 10px;" onclick="launchMultiplayerMatch()">Start Match</button>
   </div>
 
   <!-- Game Over Screen -->
@@ -367,6 +376,7 @@
     const manualRoomInput = document.getElementById('manual-room-input');
     const manualNickInput = document.getElementById('manual-nick-input');
     const manualStatusMsg = document.getElementById('manual-status-msg');
+    const manualSubmitBtn = document.getElementById('manual-submit-btn');
     const guestJoinScreen = document.getElementById('guest-join-screen');
     const guestNickInput = document.getElementById('guest-nick-input');
     const guestStatusMsg = document.getElementById('guest-status-msg');
@@ -407,13 +417,14 @@
 
     let playerName = sessionStorage.getItem('paperball_player_name') || "";
 
+    // Paleta extinsa pana la 6 jucatori
     const PALETTE = [
-      { id: 1, name: "Host", zone: "#00b4d8", head: "#03045e", border: "#ffffff", trail: "rgba(0, 180, 216, 0.75)" },
+      { id: 1, name: "Player 1", zone: "#00b4d8", head: "#03045e", border: "#ffffff", trail: "rgba(0, 180, 216, 0.75)" },
       { id: 2, name: "Player 2", zone: "#ff6b81", head: "#800020", border: "#ffffff", trail: "rgba(255, 107, 129, 0.75)" },
       { id: 3, name: "Player 3", zone: "#ffa502", head: "#8c3b00", border: "#ffffff", trail: "rgba(255, 165, 2, 0.75)" },
       { id: 4, name: "Player 4", zone: "#a55eea", head: "#3c1361", border: "#ffffff", trail: "rgba(165, 94, 234, 0.75)" },
-      { id: 5, name: "Green Bot", zone: "#2ed573", head: "#0b4d24", border: "#ffffff", trail: "rgba(46, 213, 115, 0.75)" },
-      { id: 6, name: "Grey Bot", zone: "#ced6e0", head: "#2f3542", border: "#ffffff", trail: "rgba(206, 214, 224, 0.85)" }
+      { id: 5, name: "Player 5", zone: "#2ed573", head: "#0b4d24", border: "#ffffff", trail: "rgba(46, 213, 115, 0.75)" },
+      { id: 6, name: "Player 6", zone: "#ff4757", head: "#570c14", border: "#ffffff", trail: "rgba(255, 71, 87, 0.75)" }
     ];
 
     let players = [];
@@ -431,13 +442,15 @@
 
     let lastCamPos = { x: WORLD_SIZE / 2, y: WORLD_SIZE / 2 };
 
+    // Networking P2P
     let peer = null;
     let isHost = true;
     let myPlayerId = 1;
-    let guestConnections = [];
+    let guestConnections = []; // Max 5 guests (1 host + 5 guests = 6 jucatori)
     let hostConn = null;
     let pendingJoinRoomId = null;
     let rematchTimeoutTimer = null;
+    let isConnecting = false; // Protectie anti-double join
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -605,13 +618,11 @@
       }
     }
 
-    // Curățare teritoriu decuplat + verificare dacă victima a fost izolată de baza ei
     function pruneDisconnectedTerritory(ownerId, targetX, targetY, isOutside) {
       let visited = new Uint8Array(GRID_RES * GRID_RES);
       const { gx, gy } = worldToGrid(targetX, targetY);
       let queue = [];
 
-      // Căutăm dacă poziția curentă a jucătorului se mai află pe propria bază
       if (getCell(gx, gy) === ownerId) {
         queue.push(gx, gy); 
         visited[gy * GRID_RES + gx] = 1;
@@ -631,7 +642,6 @@
         }
       }
 
-      // Orice celulă care nu mai comunică direct cu baza activă este pierdută
       for (let i = 0; i < worldGrid.length; i++) {
         if (worldGrid[i] === ownerId && visited[i] === 0) {
           worldGrid[i] = 0;
@@ -639,11 +649,9 @@
       }
     }
 
-    // Regula eliminării: dacă jucătorul este separat de baza lui în timp ce e afară
     function validatePlayerBaseConnection(victim, capturer) {
       if (!victim.alive) return;
 
-      // 1. Verificăm dacă mai are celule de teritoriu deloc
       let hasAnyTerritory = false;
       for (let i = 0; i < worldGrid.length; i++) {
         if (worldGrid[i] === victim.id) {
@@ -657,11 +665,8 @@
         return;
       }
 
-      // 2. Dacă este afară pe traseu, verificăm dacă punctul de unde a plecat dâra mai este conectat la teritoriul lui
       if (victim.outside && victim.trail.length > 0) {
         const originPt = worldToGrid(victim.trail[0].x, victim.trail[0].y);
-        
-        // Verificăm dacă celula de plecare a fost tăiată/asimilată
         let originStillConnected = false;
         for (let dy = -1; dy <= 1 && !originStillConnected; dy++) {
           for (let dx = -1; dx <= 1 && !originStillConnected; dx++) {
@@ -671,7 +676,6 @@
           }
         }
 
-        // Dacă punctul de start al dârei nu mai este legat de baza lui -> adversarul este decuplat și moare!
         if (!originStillConnected) {
           victim.kill(capturer, false);
         }
@@ -901,7 +905,6 @@
 
         sealEnclosedHoles(this.id);
 
-        // Curățăm teritoriile tăiate și verificăm dacă adversarul a fost izolat complet de bază
         affectedVictims.forEach(vId => {
           const victim = players.find(p => p.id === vId);
           if (victim && victim.alive) {
@@ -1017,8 +1020,14 @@
       });
 
       peer.on('connection', (c) => {
+        // Ignora reconectarile duplicate de la acelasi browser
         if (guestConnections.some(g => g.conn.peer === c.peer)) return;
-        if (guestConnections.length >= 3) { c.close(); return; }
+        
+        // Limita extinsa: Max 5 oaspeti (6 jucatori total)
+        if (guestConnections.length >= 5) { 
+          c.close(); 
+          return; 
+        }
 
         const assignedId = guestConnections.length + 2;
         const guestObj = { conn: c, playerId: assignedId, name: "Player " + assignedId, rematchAccepted: false };
@@ -1143,14 +1152,20 @@
       startScreen.style.display = 'none';
       manualJoinScreen.style.display = 'flex';
       manualNickInput.value = playerName || "";
+      isConnecting = false;
+      manualSubmitBtn.disabled = false;
+      manualSubmitBtn.textContent = "Connect";
     }
 
     function backToMainMenu() {
       manualJoinScreen.style.display = 'none';
       startScreen.style.display = 'flex';
+      isConnecting = false;
     }
 
     function submitManualJoin() {
+      if (isConnecting) return; // Blocare click dublu
+
       let code = manualRoomInput.value.trim();
       if (!code) return;
       if (!code.startsWith("pb-")) code = "pb-" + code;
@@ -1158,8 +1173,12 @@
       playerName = nick;
       sessionStorage.setItem('paperball_player_name', playerName);
 
+      isConnecting = true;
+      manualSubmitBtn.disabled = true;
+      manualSubmitBtn.textContent = "Connecting...";
       manualStatusMsg.textContent = "Connecting to room " + code + "...";
-      connectAsGuest(code, manualStatusMsg, manualJoinScreen);
+
+      connectAsGuest(code, manualStatusMsg, manualJoinScreen, manualSubmitBtn);
     }
 
     function setupGuestJoinFlow(hostId) {
@@ -1168,22 +1187,33 @@
       guestJoinScreen.style.display = 'flex';
       guestNickInput.value = playerName || "Player " + Math.floor(Math.random() * 100);
       guestNickInput.focus();
+      isConnecting = false;
+      joinBtn.disabled = false;
+      joinBtn.textContent = "Join Room";
     }
 
     function confirmGuestJoin() {
+      if (isConnecting) return; // Blocare click dublu
+
       const nick = guestNickInput.value.trim() || "Guest";
       playerName = nick;
       sessionStorage.setItem('paperball_player_name', playerName);
+
+      isConnecting = true;
       joinBtn.disabled = true;
+      joinBtn.textContent = "Connecting...";
       guestStatusMsg.textContent = "Connecting to lobby...";
-      connectAsGuest(pendingJoinRoomId, guestStatusMsg, guestJoinScreen);
+
+      connectAsGuest(pendingJoinRoomId, guestStatusMsg, guestJoinScreen, joinBtn);
     }
 
-    function connectAsGuest(roomId, statusElement, screenToHide) {
+    function connectAsGuest(roomId, statusElement, screenToHide, buttonElement) {
       isHost = false;
       peer = new Peer();
+
       peer.on('open', () => {
         hostConn = peer.connect(roomId, { reliable: true });
+
         hostConn.on('open', () => {
           statusElement.textContent = "Connected! Waiting for host to click Start...";
           hostConn.send({ type: 'set_name', name: playerName });
@@ -1234,6 +1264,15 @@
           }
         });
 
+        hostConn.on('close', () => {
+          statusElement.textContent = "Disconnected from room or room is full (Max 6).";
+          if (buttonElement) {
+            buttonElement.disabled = false;
+            buttonElement.textContent = "Retry";
+          }
+          isConnecting = false;
+        });
+
         setInterval(() => {
           if (hostConn && hostConn.open && gameStarted && !isGameOver) {
             const angle = Math.atan2(mousePos.y - canvas.height / 2, mousePos.x - canvas.width / 2);
@@ -1241,11 +1280,20 @@
           }
         }, 1000 / 25);
       });
+
+      peer.on('error', (err) => {
+        statusElement.textContent = "Connection error. Check room code.";
+        if (buttonElement) {
+          buttonElement.disabled = false;
+          buttonElement.textContent = "Retry";
+        }
+        isConnecting = false;
+      });
     }
 
     function saveNick() {
       const val = playerInput.value.trim();
-      playerName = val.length > 0 ? val : "You";
+      playerName = val.length > 0 ? val : "Player 1";
       sessionStorage.setItem('paperball_player_name', playerName);
       PALETTE[0].name = playerName;
     }
@@ -1274,6 +1322,7 @@
       const initialSpawnRadius = 750;
       players = [];
 
+      // Total participanti: Host (1) + Invitati conectati + Boti (pana la 6 maxim)
       const activeHumanCount = isHost ? (1 + guestConnections.length) : 2;
       const totalCount = Math.min(6, activeHumanCount + numBots);
 
@@ -1425,7 +1474,7 @@
         });
       }
 
-      // Dâre
+      // Dare
       players.forEach(p => {
         if (p.trail && p.trail.length > 0) {
           ctx.beginPath();
