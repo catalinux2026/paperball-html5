@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Paper Ball - Online Multiplayer V2.7</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; touch-action: none; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d1117;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      user-select: none;
+    }
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: #161b22;
+    }
+    #ui-container {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 5;
+    }
+    .badge {
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 20px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      width: fit-content;
+      border: 1px solid rgba(255,255,255,0.1);
+      pointer-events: none;
+    }
+    .exit-btn {
+      background: rgba(218, 54, 51, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 20px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      width: fit-content;
+      border: 1px solid rgba(255,255,255,0.2);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .exit-btn:hover {
+      background: #f85149;
+      transform: scale(1.04);
+    }
+    #fs-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 38px;
+      height: 38px;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 10;
+    }
+    #leaderboard {
+      position: absolute;
+      top: 68px;
+      right: 20px;
+      background: transparent;
+      padding: 0;
+      color: #fff;
+      min-width: 215px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #leaderboard h3 {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #cbd5e1;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    }
+    .lb-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+    }
+    #speed-control-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(13, 17, 23, 0.85);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 10px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: #fff;
+      z-index: 10;
+    }
+    #speed-slider { width: 140px; cursor: pointer; }
+
+    .modal-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      background: rgba(10, 14, 20, 0.88);
+      backdrop-filter: blur(8px);
+    }
+    #game-over-screen, #victory-screen {
+      background: rgba(10, 14, 20, 0.35);
+      backdrop-filter: blur(2px);
+    }
+    #pause-screen {
+      background: rgba(10, 14, 20, 0.45);
+      backdrop-filter: none;
+    }
+    .btn-container { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .btn-action {
+      padding: 12px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+      transition: transform 0.15s ease;
+    }
+    .btn-action:hover { transform: scale(1.05); }
+    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    #start-btn, #host-btn, #join-btn, #manual-join-btn { background: #0969da; }
+    #revive-btn { background: #238636; }
+    #restart-btn { background: #da3633; }
+    #rematch-btn { background: #238636; }
+
+    .input-field {
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 25px;
+      border: 2px solid #30363d;
+      background: #161b22;
+      color: #fff;
+      outline: none;
+      text-align: center;
+      margin-bottom: 14px;
+      width: 260px;
+    }
+
+    #lobby-qr-container {
+      background: #fff;
+      padding: 12px;
+      border-radius: 12px;
+      margin: 12px 0;
+    }
+    #room-link-text {
+      color: #58a6ff;
+      font-size: 12px;
+      word-break: break-all;
+      max-width: 320px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .config-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      color: #cbd5e1;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .config-select {
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #58a6ff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    #player-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+      min-width: 260px;
+    }
+    .player-slot {
+      background: rgba(255,255,255,0.06);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ui-container">
+    <div class="badge">Territory: <span id="score-val" style="color: #2ed573;">0%</span></div>
+    <div class="badge">Kills: <span id="kills-val" style="color: #ffa502;">0</span></div>
+    <button class="exit-btn" onclick="confirmExitGame()">Exit Game</button>
+  </div>
+
+  <button id="fs-btn" onclick="toggleFullscreen()">⛶</button>
+
+  <div id="leaderboard">
+    <h3>Leaderboard</h3>
+    <div id="lb-rows"></div>
+  </div>
+
+  <div id="speed-control-panel">
+    <label style="font-size:11px; color:#8b949e; display:flex; justify-content:space-between;">
+      SPEED: <span id="speed-display" style="color:#58a6ff;">4.0</span>
+    </label>
+    <input type="range" id="speed-slider" min="1.0" max="15.0" step="0.5" value="4.0" />
+  </div>
+
+  <!-- Start Menu -->
+  <div id="start-screen" class="modal-screen" style="display: flex;">
+    <h1 style="color: #58a6ff; margin-bottom: 6px;">PAPER BALL</h1>
+    <p style="color: #8b949e; margin-bottom: 20px;">Solo vs AI or Multi-Device Online V2.7</p>
+    <input type="text" id="player-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
+    
+    <div class="btn-container">
+      <button id="start-btn" class="btn-action" onclick="startSoloMatch()">Solo Match</button>
+      <button id="host-btn" class="btn-action" style="background:#238636;" onclick="openHostLobby()">Create Online Lobby</button>
+      <button id="manual-join-btn" class="btn-action" style="background:#8250df;" onclick="openManualJoinScreen()">Join Lobby</button>
+    </div>
+  </div>
+
+  <!-- Manual Join Lobby -->
+  <div id="manual-join-screen" class="modal-screen">
+    <h1 style="color: #8250df; margin-bottom: 6px;">JOIN LOBBY</h1>
+    <p style="color: #8b949e; margin-bottom: 16px;">Enter Room Code (e.g. 4821 or pb-4821):</p>
+    <input type="text" id="manual-room-input" class="input-field" maxlength="12" placeholder="Room Code..." />
+    <input type="text" id="manual-nick-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
+    <div class="btn-container">
+      <button class="btn-action" style="background:#8250df;" onclick="submitManualJoin()">Connect</button>
+      <button class="btn-action" style="background:#da3633;" onclick="backToMainMenu()">Back</button>
+    </div>
+    <p id="manual-status-msg" style="margin-top:14px; font-size:14px; color:#cbd5e1;"></p>
+  </div>
+
+  <!-- Guest Join Screen -->
+  <div id="guest-join-screen" class="modal-screen">
+    <h1 style="color: #58a6ff; margin-bottom: 6px;">JOIN ROOM</h1>
+    <p style="color: #8b949e; margin-bottom: 18px;">Choose your player nickname:</p>
+    <input type="text" id="guest-nick-input" class="input-field" maxlength="14" placeholder="Nickname..." />
+    <button id="join-btn" class="btn-action" onclick="confirmGuestJoin()">Join Room</button>
+    <p id="guest-status-msg" style="margin-top:14px; font-size:14px; color:#cbd5e1;"></p>
+  </div>
+
+  <!-- Lobby Host -->
+  <div id="lobby-screen" class="modal-screen">
+    <h1 style="color: #2ed573; margin-bottom: 4px; font-size: 32px;">ONLINE ROOM</h1>
+    <p style="margin-bottom: 8px; font-size: 14px; color:#94a3b8;">Scan with phone camera or use code to connect:</p>
+    <div id="lobby-qr-container"></div>
+    <div id="room-link-text">Generating link...</div>
+
+    <div class="config-box">
+      <span>AI Bots:</span>
+      <select id="bot-count-select" class="config-select">
+        <option value="4">4 Bots</option>
+        <option value="3">3 Bots</option>
+        <option value="2">2 Bots</option>
+        <option value="1">1 Bot</option>
+        <option value="0" selected>0 Bots (Players Only)</option>
+      </select>
+    </div>
+
+    <div id="player-list">
+      <div class="player-slot" style="color: #00b4d8;">1. Host <span id="host-name-tag">Ready</span></div>
+    </div>
+
+    <button class="btn-action" style="background:#0969da; margin-top: 10px;" onclick="launchMultiplayerMatch()">Start Match</button>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="game-over-screen" class="modal-screen">
+    <h1 id="death-title" style="color: #ff4757;">YOU WERE ELIMINATED!</h1>
+    <p id="death-stat">You captured 0% of the arena</p>
+    <div class="btn-container">
+      <button id="revive-btn" class="btn-action" onclick="revivePlayer()">Revive</button>
+      <button id="restart-btn" class="btn-action" onclick="confirmExitGame()">Exit Game</button>
+    </div>
+  </div>
+
+  <!-- Victory Screen -->
+  <div id="victory-screen" class="modal-screen">
+    <h1 style="color: #2ed573; font-size: 54px;">VICTORY!</h1>
+    <p id="victory-stat">You conquered the arena!</p>
+    <div class="btn-container">
+      <button id="rematch-btn" class="btn-action" onclick="requestRematch()">Request Rematch</button>
+      <button class="btn-action" style="background:#da3633;" onclick="confirmExitGame()">Exit Game</button>
+    </div>
+  </div>
+
+  <!-- Pop-up Rematch Accept -->
+  <div id="rematch-popup" class="modal-screen">
+    <h1 style="color: #58a6ff; font-size: 32px;">REMATCH REQUEST</h1>
+    <p id="rematch-msg" style="color: #fff; font-size: 18px; margin-bottom: 20px;">The winner wants a Rematch!</p>
+    <div class="btn-container">
+      <button class="btn-action" style="background:#238636;" onclick="acceptRematch(true)">Accept Rematch</button>
+      <button class="btn-action" style="background:#da3633;" onclick="acceptRematch(false)">Exit</button>
+    </div>
+  </div>
+
+  <!-- Pause Screen -->
+  <div id="pause-screen" class="modal-screen">
+    <h1 style="color: #58a6ff;">GAME PAUSED</h1>
+    <p>Press <b>ESC</b> or click below to resume</p>
+    <div class="btn-container">
+      <button class="btn-action" style="background:#0969da;" onclick="togglePause()">Resume Game</button>
+      <button class="btn-action" style="background:#da3633;" onclick="confirmExitGame()">Exit Game</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const scoreVal = document.getElementById('score-val');
+    const killsVal = document.getElementById('kills-val');
+    const lbRows = document.getElementById('lb-rows');
+    const fsBtn = document.getElementById('fs-btn');
+    const startScreen = document.getElementById('start-screen');
+    const manualJoinScreen = document.getElementById('manual-join-screen');
+    const manualRoomInput = document.getElementById('manual-room-input');
+    const manualNickInput = document.getElementById('manual-nick-input');
+    const manualStatusMsg = document.getElementById('manual-status-msg');
+    const guestJoinScreen = document.getElementById('guest-join-screen');
+    const guestNickInput = document.getElementById('guest-nick-input');
+    const guestStatusMsg = document.getElementById('guest-status-msg');
+    const joinBtn = document.getElementById('join-btn');
+    const lobbyScreen = document.getElementById('lobby-screen');
+    const playerInput = document.getElementById('player-input');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const deathTitle = document.getElementById('death-title');
+    const deathStat = document.getElementById('death-stat');
+    const reviveBtn = document.getElementById('revive-btn');
+    const victoryScreen = document.getElementById('victory-screen');
+    const victoryStat = document.getElementById('victory-stat');
+    const rematchBtn = document.getElementById('rematch-btn');
+    const rematchPopup = document.getElementById('rematch-popup');
+    const rematchMsg = document.getElementById('rematch-msg');
+    const pauseScreen = document.getElementById('pause-screen');
+    const speedSlider = document.getElementById('speed-slider');
+    const speedDisplay = document.getElementById('speed-display');
+    const botSelect = document.getElementById('bot-count-select');
+    const playerListDiv = document.getElementById('player-list');
+    const hostNameTag = document.getElementById('host-name-tag');
+
+    const WORLD_SIZE = 2600;
+    const GRID_RES = 160; 
+    const CELL_PIXELS = WORLD_SIZE / GRID_RES;
+    const WORLD_RADIUS = WORLD_SIZE / 2;
+
+    let worldGrid = new Uint8Array(GRID_RES * GRID_RES);
+
+    let TOTAL_ARENA_CELLS = 0;
+    for (let gy = 0; gy < GRID_RES; gy++) {
+      for (let gx = 0; gx < GRID_RES; gx++) {
+        const cx = (gx + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+        const cy = (gy + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+        if (Math.hypot(cx, cy) <= WORLD_RADIUS) TOTAL_ARENA_CELLS++;
+      }
+    }
+
+    let playerName = sessionStorage.getItem('paperball_player_name') || "";
+
+    const PALETTE = [
+      { id: 1, name: "Host", zone: "#00b4d8", head: "#03045e", border: "#ffffff", trail: "rgba(0, 180, 216, 0.75)" },
+      { id: 2, name: "Player 2", zone: "#ff6b81", head: "#800020", border: "#ffffff", trail: "rgba(255, 107, 129, 0.75)" },
+      { id: 3, name: "Player 3", zone: "#ffa502", head: "#8c3b00", border: "#ffffff", trail: "rgba(255, 165, 2, 0.75)" },
+      { id: 4, name: "Player 4", zone: "#a55eea", head: "#3c1361", border: "#ffffff", trail: "rgba(165, 94, 234, 0.75)" },
+      { id: 5, name: "Green Bot", zone: "#2ed573", head: "#0b4d24", border: "#ffffff", trail: "rgba(46, 213, 115, 0.75)" },
+      { id: 6, name: "Grey Bot", zone: "#ced6e0", head: "#2f3542", border: "#ffffff", trail: "rgba(206, 214, 224, 0.85)" }
+    ];
+
+    let players = [];
+    let playerKills = 0;
+    let isPaused = false;
+    let isGameOver = false;
+    let isVictory = false;
+    let gameStarted = false;
+    let playerSpeedSetting = 4.0;
+    let matchStartTime = 0;
+
+    let mousePos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    let inputMode = 'mouse';
+    let keyboardTargetAngle = 0;
+
+    let lastCamPos = { x: WORLD_SIZE / 2, y: WORLD_SIZE / 2 };
+
+    let peer = null;
+    let isHost = true;
+    let myPlayerId = 1;
+    let guestConnections = [];
+    let hostConn = null;
+    let pendingJoinRoomId = null;
+    let rematchTimeoutTimer = null;
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+
+    window.addEventListener('mousemove', (e) => {
+      inputMode = 'mouse';
+      mousePos.x = e.clientX;
+      mousePos.y = e.clientY;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        inputMode = 'mouse';
+        mousePos.x = e.touches[0].clientX;
+        mousePos.y = e.touches[0].clientY;
+      }
+    }, { passive: false });
+
+    speedSlider.addEventListener('input', (e) => {
+      setSpeedValue(parseFloat(e.target.value));
+    });
+
+    function setSpeedValue(val) {
+      playerSpeedSetting = Math.max(1.0, Math.min(15.0, val));
+      speedSlider.value = playerSpeedSetting;
+      speedDisplay.textContent = playerSpeedSetting.toFixed(1);
+
+      if (isHost) {
+        const p = players.find(pl => pl.id === myPlayerId);
+        if (p) p.speed = playerSpeedSetting;
+      } else if (hostConn && hostConn.open) {
+        hostConn.send({ type: 'set_speed', speed: playerSpeedSetting });
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (!gameStarted) return;
+      if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
+      if (e.key === 'Escape') {
+        if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+        else if (!isGameOver && !isVictory) togglePause();
+        return;
+      }
+
+      if (e.key === '+' || e.key === '=') {
+        setSpeedValue(Math.round(playerSpeedSetting + 1.0));
+        return;
+      }
+      if (e.key === '-' || e.key === '_') {
+        setSpeedValue(Math.round(playerSpeedSetting - 1.0));
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      let newAngle = null;
+      if (key === 'w' || key === 'arrowup') newAngle = -Math.PI / 2;
+      else if (key === 's' || key === 'arrowdown') newAngle = Math.PI / 2;
+      else if (key === 'a' || key === 'arrowleft') newAngle = Math.PI;
+      else if (key === 'd' || key === 'arrowright') newAngle = 0;
+      if (newAngle !== null) { inputMode = 'keyboard'; keyboardTargetAngle = newAngle; }
+    });
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+      else document.exitFullscreen().catch(()=>{});
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+      pauseScreen.style.display = isPaused ? 'flex' : 'none';
+    }
+
+    function confirmExitGame() {
+      if (confirm("Are you sure you want to exit the match?")) {
+        if (!isHost && hostConn && hostConn.open) {
+          hostConn.send({ type: 'leave_game', playerId: myPlayerId });
+        }
+        window.location.href = window.location.origin + window.location.pathname;
+      }
+    }
+
+    function getCell(gx, gy) {
+      if (gx < 0 || gx >= GRID_RES || gy < 0 || gy >= GRID_RES) return 255;
+      return worldGrid[gy * GRID_RES + gx];
+    }
+    function setCell(gx, gy, val) {
+      if (gx >= 0 && gx < GRID_RES && gy >= 0 && gy < GRID_RES) worldGrid[gy * GRID_RES + gx] = val;
+    }
+    function worldToGrid(x, y) {
+      return { gx: Math.floor(x / CELL_PIXELS), gy: Math.floor(y / CELL_PIXELS) };
+    }
+
+    function findSafeSpawnPoint() {
+      const buffer = 4;
+      for (let minPlayerDist of [350, 240, 160]) {
+        let attempts = 0;
+        while (attempts < 200) {
+          attempts++;
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * (WORLD_RADIUS - 220);
+          const testX = WORLD_SIZE / 2 + Math.cos(angle) * dist;
+          const testY = WORLD_SIZE / 2 + Math.sin(angle) * dist;
+          const { gx, gy } = worldToGrid(testX, testY);
+
+          let hasConflict = false;
+          for (let dy = -buffer; dy <= buffer; dy++) {
+            for (let dx = -buffer; dx <= buffer; dx++) {
+              if (getCell(gx + dx, gy + dy) !== 0) { hasConflict = true; break; }
+            }
+            if (hasConflict) break;
+          }
+          if (hasConflict) continue;
+
+          let tooClose = false;
+          for (let p of players) {
+            if (p && p.alive && Math.hypot(testX - p.x, testY - p.y) < minPlayerDist) {
+              tooClose = true; break;
+            }
+          }
+          if (tooClose) continue;
+          return { x: testX, y: testY };
+        }
+      }
+      return null;
+    }
+
+    function sealEnclosedHoles(ownerId) {
+      let isExterior = new Uint8Array(GRID_RES * GRID_RES);
+      let q = [];
+      for (let gy = 0; gy < GRID_RES; gy++) {
+        for (let gx = 0; gx < GRID_RES; gx++) {
+          const cx = (gx + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+          const cy = (gy + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+          if (Math.hypot(cx, cy) >= WORLD_RADIUS - 40) {
+            const idx = gy * GRID_RES + gx;
+            if (worldGrid[idx] !== ownerId) { isExterior[idx] = 1; q.push(gx, gy); }
+          }
+        }
+      }
+      const dirs = [[1,0], [-1,0], [0,1], [0,-1], [1,1], [-1,-1], [1,-1], [-1,1]];
+      while (q.length > 0) {
+        let cy = q.pop(), cx = q.pop();
+        for (let [dx, dy] of dirs) {
+          let nx = cx + dx, ny = cy + dy;
+          if (nx >= 0 && nx < GRID_RES && ny >= 0 && ny < GRID_RES) {
+            let idx = ny * GRID_RES + nx;
+            if (isExterior[idx] === 0 && worldGrid[idx] !== ownerId) {
+              isExterior[idx] = 1; q.push(nx, ny);
+            }
+          }
+        }
+      }
+      for (let gy = 0; gy < GRID_RES; gy++) {
+        for (let gx = 0; gx < GRID_RES; gx++) {
+          const cx = (gx + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+          const cy = (gy + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+          if (Math.hypot(cx, cy) < WORLD_RADIUS) {
+            const idx = gy * GRID_RES + gx;
+            if (isExterior[idx] === 0 && worldGrid[idx] === 0) worldGrid[idx] = ownerId;
+          }
+        }
+      }
+    }
+
+    // Curățare teritoriu decuplat + verificare dacă victima a fost izolată de baza ei
+    function pruneDisconnectedTerritory(ownerId, targetX, targetY, isOutside) {
+      let visited = new Uint8Array(GRID_RES * GRID_RES);
+      const { gx, gy } = worldToGrid(targetX, targetY);
+      let queue = [];
+
+      // Căutăm dacă poziția curentă a jucătorului se mai află pe propria bază
+      if (getCell(gx, gy) === ownerId) {
+        queue.push(gx, gy); 
+        visited[gy * GRID_RES + gx] = 1;
+      }
+
+      while (queue.length > 0) {
+        let cy = queue.pop(), cx = queue.pop();
+        for (let [dx, dy] of [[1,0], [-1,0], [0,1], [0,-1]]) {
+          let nx = cx + dx, ny = cy + dy;
+          if (nx >= 0 && nx < GRID_RES && ny >= 0 && ny < GRID_RES) {
+            let idx = ny * GRID_RES + nx;
+            if (visited[idx] === 0 && worldGrid[idx] === ownerId) {
+              visited[idx] = 1; 
+              queue.push(nx, ny);
+            }
+          }
+        }
+      }
+
+      // Orice celulă care nu mai comunică direct cu baza activă este pierdută
+      for (let i = 0; i < worldGrid.length; i++) {
+        if (worldGrid[i] === ownerId && visited[i] === 0) {
+          worldGrid[i] = 0;
+        }
+      }
+    }
+
+    // Regula eliminării: dacă jucătorul este separat de baza lui în timp ce e afară
+    function validatePlayerBaseConnection(victim, capturer) {
+      if (!victim.alive) return;
+
+      // 1. Verificăm dacă mai are celule de teritoriu deloc
+      let hasAnyTerritory = false;
+      for (let i = 0; i < worldGrid.length; i++) {
+        if (worldGrid[i] === victim.id) {
+          hasAnyTerritory = true;
+          break;
+        }
+      }
+
+      if (!hasAnyTerritory) {
+        victim.kill(capturer, false);
+        return;
+      }
+
+      // 2. Dacă este afară pe traseu, verificăm dacă punctul de unde a plecat dâra mai este conectat la teritoriul lui
+      if (victim.outside && victim.trail.length > 0) {
+        const originPt = worldToGrid(victim.trail[0].x, victim.trail[0].y);
+        
+        // Verificăm dacă celula de plecare a fost tăiată/asimilată
+        let originStillConnected = false;
+        for (let dy = -1; dy <= 1 && !originStillConnected; dy++) {
+          for (let dx = -1; dx <= 1 && !originStillConnected; dx++) {
+            if (getCell(originPt.gx + dx, originPt.gy + dy) === victim.id) {
+              originStillConnected = true;
+            }
+          }
+        }
+
+        // Dacă punctul de start al dârei nu mai este legat de baza lui -> adversarul este decuplat și moare!
+        if (!originStillConnected) {
+          victim.kill(capturer, false);
+        }
+      }
+    }
+
+    class Character {
+      constructor(cfg, isBot = false, spawnPos = null, isRemote = false) {
+        this.id = cfg.id;
+        this.name = cfg.name;
+        this.zoneColor = cfg.zone;
+        this.headColor = cfg.head;
+        this.borderColor = cfg.border;
+        this.trailColor = cfg.trail;
+        this.isBot = isBot;
+        this.isRemote = isRemote;
+
+        this.speed = (isBot || isRemote) ? 4.0 : playerSpeedSetting;
+        this.radius = 16;
+        this.trail = [];
+        this.alive = false;
+        this.outside = false;
+        this.botTargetAngle = Math.random() * Math.PI * 2;
+        this.botTimer = 0;
+        this.respawnFrames = 0;
+        this.isPermanentlyDead = false;
+
+        if (this.initPosition(spawnPos)) {
+          this.alive = true;
+          this.claimInitialZone();
+        }
+      }
+
+      initPosition(pos) {
+        let spawn = pos || findSafeSpawnPoint();
+        if (!spawn) return false;
+        this.x = spawn.x;
+        this.y = spawn.y;
+        this.angle = Math.random() * Math.PI * 2;
+        return true;
+      }
+
+      claimInitialZone() {
+        const { gx, gy } = worldToGrid(this.x, this.y);
+        const r = 4;
+        for (let y = -r; y <= r; y++) {
+          for (let x = -r; x <= r; x++) {
+            if (x * x + y * y <= r * r) setCell(gx + x, gy + y, this.id);
+          }
+        }
+      }
+
+      respawn() {
+        this.trail = [];
+        this.outside = false;
+        if (this.initPosition(null)) {
+          this.alive = true;
+          this.isPermanentlyDead = false;
+          this.claimInitialZone();
+          return true;
+        }
+        return false;
+      }
+
+      update() {
+        if (!this.alive) {
+          if (this.isBot && !this.isPermanentlyDead) {
+            this.respawnFrames--;
+            if (this.respawnFrames <= 0 && !this.respawn()) this.isPermanentlyDead = true;
+          }
+          return;
+        }
+
+        if (this.id === myPlayerId && !this.isRemote && !this.isBot) {
+          let target = this.angle;
+          if (inputMode === 'mouse') {
+            target = Math.atan2(mousePos.y - canvas.height / 2, mousePos.x - canvas.width / 2);
+          } else {
+            target = keyboardTargetAngle;
+          }
+          let diff = target - this.angle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          this.angle += diff * Math.min(0.28, 0.14 + (this.speed / 50));
+        } else if (this.isBot) {
+          this.updateBotAI();
+        }
+
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+
+        const dx = this.x - WORLD_SIZE / 2, dy = this.y - WORLD_SIZE / 2;
+        const dist = Math.hypot(dx, dy);
+        if (dist > WORLD_RADIUS - this.radius) {
+          this.x = WORLD_SIZE / 2 + (dx / dist) * (WORLD_RADIUS - this.radius);
+          this.y = WORLD_SIZE / 2 + (dy / dist) * (WORLD_RADIUS - this.radius);
+        }
+
+        const { gx, gy } = worldToGrid(this.x, this.y);
+        const curOwner = getCell(gx, gy);
+
+        if (curOwner !== this.id) {
+          this.outside = true;
+          const last = this.trail[this.trail.length - 1];
+          if (!last || Math.hypot(this.x - last.x, this.y - last.y) > 4) {
+            this.trail.push({ x: this.x, y: this.y });
+          }
+        } else if (this.outside) {
+          this.outside = false;
+          this.trail.push({ x: this.x, y: this.y });
+          this.capturePolygon();
+          this.trail = [];
+        }
+
+        players.forEach(p => {
+          if (!p.alive || p === this) return;
+          for (let i = 0; i < p.trail.length; i++) {
+            if (Math.hypot(this.x - p.trail[i].x, this.y - p.trail[i].y) < this.radius + 6) {
+              p.kill(this, true); break;
+            }
+          }
+        });
+      }
+
+      updateBotAI() {
+        this.botTimer--;
+        let preyPoint = null;
+        for (let p of players) {
+          if (!p.alive || p === this || p.trail.length === 0) continue;
+          for (let i = 0; i < p.trail.length; i += 4) {
+            if (Math.hypot(this.x - p.trail[i].x, this.y - p.trail[i].y) < 160) {
+              preyPoint = p.trail[i]; break;
+            }
+          }
+          if (preyPoint) break;
+        }
+
+        if (preyPoint) {
+          this.botTargetAngle = Math.atan2(preyPoint.y - this.y, preyPoint.x - this.x);
+        } else if (this.botTimer <= 0) {
+          this.botTimer = Math.floor(20 + Math.random() * 30);
+          if (this.outside && this.trail.length > 25) {
+            const { gx, gy } = worldToGrid(this.x, this.y);
+            let closestDist = Infinity, homeAngle = this.angle;
+            for (let y = -20; y <= 20; y += 4) {
+              for (let x = -20; x <= 20; x += 4) {
+                if (getCell(gx + x, gy + y) === this.id) {
+                  let d = Math.hypot(x, y);
+                  if (d < closestDist) { closestDist = d; homeAngle = Math.atan2(y, x); }
+                }
+              }
+            }
+            this.botTargetAngle = homeAngle;
+          } else {
+            this.botTargetAngle += (Math.random() - 0.5) * 1.2;
+          }
+        }
+
+        if (Math.hypot(this.x - WORLD_SIZE / 2, this.y - WORLD_SIZE / 2) > WORLD_RADIUS - 100) {
+          this.botTargetAngle = Math.atan2(WORLD_SIZE / 2 - this.y, WORLD_SIZE / 2 - this.x);
+        }
+        let diff = this.botTargetAngle - this.angle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        this.angle += diff * 0.16;
+      }
+
+      capturePolygon() {
+        if (this.trail.length < 3) return;
+
+        let affectedVictims = new Set();
+
+        for (let i = 0; i < this.trail.length - 1; i++) {
+          let p1 = worldToGrid(this.trail[i].x, this.trail[i].y);
+          let p2 = worldToGrid(this.trail[i + 1].x, this.trail[i + 1].y);
+          this.rasterLine(p1.gx, p1.gy, p2.gx, p2.gy);
+        }
+
+        let visitedExterior = new Uint8Array(GRID_RES * GRID_RES);
+        let queue = [];
+
+        for (let i = 0; i < GRID_RES; i++) {
+          queue.push(i, 0, i, GRID_RES - 1, 0, i, GRID_RES - 1, i);
+        }
+
+        const dirs = [
+          [1,0], [-1,0], [0,1], [0,-1],
+          [1,1], [-1,-1], [1,-1], [-1,1]
+        ];
+
+        while (queue.length > 0) {
+          let cy = queue.pop();
+          let cx = queue.pop();
+          let idx = cy * GRID_RES + cx;
+
+          if (visitedExterior[idx] === 0 && worldGrid[idx] !== this.id) {
+            visitedExterior[idx] = 1;
+            for (let [dx, dy] of dirs) {
+              let nx = cx + dx;
+              let ny = cy + dy;
+              if (nx >= 0 && nx < GRID_RES && ny >= 0 && ny < GRID_RES) {
+                let nIdx = ny * GRID_RES + nx;
+                if (visitedExterior[nIdx] === 0 && worldGrid[nIdx] !== this.id) {
+                  queue.push(nx, ny);
+                }
+              }
+            }
+          }
+        }
+
+        for (let gy = 0; gy < GRID_RES; gy++) {
+          for (let gx = 0; gx < GRID_RES; gx++) {
+            let idx = gy * GRID_RES + gx;
+            if (visitedExterior[idx] === 0) {
+              const cx = (gx + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+              const cy = (gy + 0.5) * CELL_PIXELS - WORLD_SIZE / 2;
+              if (Math.hypot(cx, cy) <= WORLD_RADIUS) {
+                let prev = worldGrid[idx];
+                if (prev !== 0 && prev !== this.id && prev !== 255) {
+                  affectedVictims.add(prev);
+                }
+                worldGrid[idx] = this.id;
+              }
+            }
+          }
+        }
+
+        sealEnclosedHoles(this.id);
+
+        // Curățăm teritoriile tăiate și verificăm dacă adversarul a fost izolat complet de bază
+        affectedVictims.forEach(vId => {
+          const victim = players.find(p => p.id === vId);
+          if (victim && victim.alive) {
+            pruneDisconnectedTerritory(vId, victim.x, victim.y, victim.outside);
+            validatePlayerBaseConnection(victim, this);
+          }
+        });
+
+        broadcastTerritoryUpdate();
+      }
+
+      rasterLine(x0, y0, x1, y1) {
+        let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        let err = dx + dy;
+        while (true) {
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let ox = -1; ox <= 1; ox++) {
+              setCell(x0 + ox, y0 + oy, this.id);
+            }
+          }
+          if (x0 === x1 && y0 === y1) break;
+          let e2 = 2 * err;
+          if (e2 >= dy) { err += dy; x0 += sx; }
+          if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+      }
+
+      kill(killer, directTrailHit = false) {
+        this.alive = false;
+        const newOwner = killer ? killer.id : 0;
+        if (directTrailHit && killer && this.trail.length > 0) {
+          for (let i = 0; i < this.trail.length - 1; i++) {
+            let p1 = worldToGrid(this.trail[i].x, this.trail[i].y);
+            let p2 = worldToGrid(this.trail[i + 1].x, this.trail[i + 1].y);
+            killer.rasterLine(p1.gx, p1.gy, p2.gx, p2.gy);
+          }
+        }
+        this.trail = [];
+        for (let i = 0; i < worldGrid.length; i++) {
+          if (worldGrid[i] === this.id) worldGrid[i] = newOwner;
+        }
+
+        if (killer && killer.id === myPlayerId) {
+          playerKills++; killsVal.textContent = playerKills; sealEnclosedHoles(killer.id);
+        }
+
+        broadcastTerritoryUpdate();
+
+        if (this.id === myPlayerId) {
+          endGame();
+        }
+
+        if (isHost && this.isRemote) {
+          const guest = guestConnections.find(g => g.playerId === this.id);
+          if (guest && guest.conn.open) {
+            guest.conn.send({ type: 'player_eliminated' });
+          }
+        }
+
+        if (this.isBot) {
+          this.respawnFrames = 300;
+        }
+      }
+    }
+
+    function broadcastTerritoryUpdate() {
+      if (!isHost || guestConnections.length === 0) return;
+      let packed = [];
+      let curVal = worldGrid[0], count = 1;
+      for (let i = 1; i < worldGrid.length; i++) {
+        if (worldGrid[i] === curVal && count < 255) {
+          count++;
+        } else {
+          packed.push(curVal, count);
+          curVal = worldGrid[i];
+          count = 1;
+        }
+      }
+      packed.push(curVal, count);
+
+      guestConnections.forEach(g => {
+        if (g.conn.open) g.conn.send({ type: 'grid_packed', data: packed });
+      });
+    }
+
+    function unpackGrid(packed) {
+      let idx = 0;
+      for (let i = 0; i < packed.length; i += 2) {
+        let val = packed[i];
+        let len = packed[i + 1];
+        for (let k = 0; k < len; k++) {
+          worldGrid[idx++] = val;
+        }
+      }
+    }
+
+    function openHostLobby() {
+      saveNick();
+      isHost = true;
+      startScreen.style.display = 'none';
+      lobbyScreen.style.display = 'flex';
+      hostNameTag.textContent = playerName;
+
+      const roomId = "pb-" + Math.floor(1000 + Math.random() * 9000);
+      peer = new Peer(roomId);
+
+      peer.on('open', (id) => {
+        const joinUrl = window.location.origin + window.location.pathname + "?join=" + id;
+        document.getElementById('room-link-text').textContent = joinUrl;
+        document.getElementById('lobby-qr-container').innerHTML = "";
+        new QRCode(document.getElementById('lobby-qr-container'), { text: joinUrl, width: 140, height: 140 });
+      });
+
+      peer.on('connection', (c) => {
+        if (guestConnections.some(g => g.conn.peer === c.peer)) return;
+        if (guestConnections.length >= 3) { c.close(); return; }
+
+        const assignedId = guestConnections.length + 2;
+        const guestObj = { conn: c, playerId: assignedId, name: "Player " + assignedId, rematchAccepted: false };
+        guestConnections.push(guestObj);
+        updateLobbyPlayerList();
+
+        c.on('data', (data) => {
+          if (data.type === 'set_name') {
+            guestObj.name = data.name;
+            PALETTE[assignedId - 1].name = data.name;
+            updateLobbyPlayerList();
+          } else if (data.type === 'input') {
+            const p = players.find(pl => pl.id === assignedId);
+            if (p) p.angle = data.angle;
+          } else if (data.type === 'set_speed') {
+            const p = players.find(pl => pl.id === assignedId);
+            if (p) p.speed = data.speed;
+          } else if (data.type === 'request_revive') {
+            const p = players.find(pl => pl.id === assignedId);
+            if (p) {
+              const revived = p.respawn();
+              c.send({ type: 'revive_result', success: revived });
+              if (revived) broadcastTerritoryUpdate();
+            }
+          } else if (data.type === 'leave_game') {
+            const p = players.find(pl => pl.id === assignedId);
+            if (p) p.kill(null, false);
+            guestConnections = guestConnections.filter(g => g.playerId !== assignedId);
+            updateLobbyPlayerList();
+            checkOpponentLeftVictory();
+          } else if (data.type === 'rematch_response') {
+            guestObj.rematchAccepted = data.accept;
+            checkAllRematchAccepted();
+          }
+        });
+
+        c.on('close', () => {
+          const p = players.find(pl => pl.id === assignedId);
+          if (p) p.kill(null, false);
+          guestConnections = guestConnections.filter(g => g.playerId !== assignedId);
+          updateLobbyPlayerList();
+          checkOpponentLeftVictory();
+        });
+      });
+    }
+
+    function updateLobbyPlayerList() {
+      let html = `<div class="player-slot" style="color: #00b4d8;">1. Host (${playerName}) <span>Ready</span></div>`;
+      guestConnections.forEach((g, idx) => {
+        html += `<div class="player-slot" style="color: ${PALETTE[g.playerId - 1].zone};">${idx + 2}. ${g.name} <span>Connected</span></div>`;
+      });
+      playerListDiv.innerHTML = html;
+    }
+
+    function launchMultiplayerMatch() {
+      lobbyScreen.style.display = 'none';
+      gameStarted = true;
+      matchStartTime = Date.now();
+      const numBots = parseInt(botSelect.value, 10);
+      initGame(numBots);
+
+      guestConnections.forEach(g => {
+        if (g.conn.open) g.conn.send({ type: 'start', playerId: g.playerId, palette: PALETTE });
+      });
+      broadcastTerritoryUpdate();
+    }
+
+    function requestRematch() {
+      if (isHost) {
+        guestConnections.forEach(g => {
+          if (g.conn.open) g.conn.send({ type: 'rematch_offer', winner: playerName });
+        });
+        startRematchTimeout();
+        resetGameForRematch();
+      } else if (hostConn && hostConn.open) {
+        hostConn.send({ type: 'request_rematch' });
+      }
+    }
+
+    function startRematchTimeout() {
+      if (rematchTimeoutTimer) clearTimeout(rematchTimeoutTimer);
+      rematchTimeoutTimer = setTimeout(() => {
+        if (!gameStarted) {
+          guestConnections.forEach(g => {
+            if (g.conn.open) g.conn.send({ type: 'rematch_timeout' });
+          });
+          window.location.href = window.location.origin + window.location.pathname;
+        }
+      }, 10000);
+    }
+
+    function checkAllRematchAccepted() {
+      const allAccepted = guestConnections.every(g => g.rematchAccepted);
+      if (allAccepted && guestConnections.length > 0) {
+        if (rematchTimeoutTimer) clearTimeout(rematchTimeoutTimer);
+        guestConnections.forEach(g => {
+          if (g.conn.open) g.conn.send({ type: 'start_rematch' });
+        });
+        resetGameForRematch();
+      }
+    }
+
+    function resetGameForRematch() {
+      victoryScreen.style.display = 'none';
+      gameOverScreen.style.display = 'none';
+      rematchPopup.style.display = 'none';
+      guestConnections.forEach(g => g.rematchAccepted = false);
+      initGame(parseInt(botSelect.value, 10) || 0);
+      broadcastTerritoryUpdate();
+    }
+
+    function acceptRematch(accept) {
+      rematchPopup.style.display = 'none';
+      if (accept) {
+        if (hostConn && hostConn.open) hostConn.send({ type: 'rematch_response', accept: true });
+      } else {
+        confirmExitGame();
+      }
+    }
+
+    function openManualJoinScreen() {
+      startScreen.style.display = 'none';
+      manualJoinScreen.style.display = 'flex';
+      manualNickInput.value = playerName || "";
+    }
+
+    function backToMainMenu() {
+      manualJoinScreen.style.display = 'none';
+      startScreen.style.display = 'flex';
+    }
+
+    function submitManualJoin() {
+      let code = manualRoomInput.value.trim();
+      if (!code) return;
+      if (!code.startsWith("pb-")) code = "pb-" + code;
+      const nick = manualNickInput.value.trim() || "Guest";
+      playerName = nick;
+      sessionStorage.setItem('paperball_player_name', playerName);
+
+      manualStatusMsg.textContent = "Connecting to room " + code + "...";
+      connectAsGuest(code, manualStatusMsg, manualJoinScreen);
+    }
+
+    function setupGuestJoinFlow(hostId) {
+      pendingJoinRoomId = hostId;
+      startScreen.style.display = 'none';
+      guestJoinScreen.style.display = 'flex';
+      guestNickInput.value = playerName || "Player " + Math.floor(Math.random() * 100);
+      guestNickInput.focus();
+    }
+
+    function confirmGuestJoin() {
+      const nick = guestNickInput.value.trim() || "Guest";
+      playerName = nick;
+      sessionStorage.setItem('paperball_player_name', playerName);
+      joinBtn.disabled = true;
+      guestStatusMsg.textContent = "Connecting to lobby...";
+      connectAsGuest(pendingJoinRoomId, guestStatusMsg, guestJoinScreen);
+    }
+
+    function connectAsGuest(roomId, statusElement, screenToHide) {
+      isHost = false;
+      peer = new Peer();
+      peer.on('open', () => {
+        hostConn = peer.connect(roomId, { reliable: true });
+        hostConn.on('open', () => {
+          statusElement.textContent = "Connected! Waiting for host to click Start...";
+          hostConn.send({ type: 'set_name', name: playerName });
+        });
+
+        hostConn.on('data', (data) => {
+          if (data.type === 'start' || data.type === 'start_rematch') {
+            if (data.playerId) myPlayerId = data.playerId;
+            screenToHide.style.display = 'none';
+            victoryScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            rematchPopup.style.display = 'none';
+            gameStarted = true;
+            matchStartTime = Date.now();
+            initGame(0);
+          } else if (data.type === 'player_eliminated') {
+            endGame();
+          } else if (data.type === 'revive_result') {
+            if (data.success) {
+              gameOverScreen.style.display = 'none';
+              isGameOver = false;
+            } else {
+              deathTitle.textContent = "NO SAFE SPACE AVAILABLE!";
+              deathStat.textContent = "The arena is full. Cannot revive.";
+              reviveBtn.style.display = 'none';
+            }
+          } else if (data.type === 'rematch_offer') {
+            rematchMsg.textContent = `${data.winner} wants a Rematch! (10s timeout)`;
+            rematchPopup.style.display = 'flex';
+          } else if (data.type === 'rematch_timeout') {
+            alert("Rematch request timed out. Returning to main menu.");
+            window.location.href = window.location.origin + window.location.pathname;
+          } else if (data.type === 'force_victory') {
+            triggerVictory(data.msg || "Opponent left the match! You won!");
+          } else if (data.type === 'grid_packed') {
+            unpackGrid(data.data);
+          } else if (data.type === 'sync') {
+            data.players.forEach(src => {
+              let target = players.find(p => p.id === src.id);
+              if (target) {
+                target.x = src.x;
+                target.y = src.y;
+                target.angle = src.angle;
+                target.alive = src.alive;
+                target.trail = src.trail;
+              }
+            });
+          }
+        });
+
+        setInterval(() => {
+          if (hostConn && hostConn.open && gameStarted && !isGameOver) {
+            const angle = Math.atan2(mousePos.y - canvas.height / 2, mousePos.x - canvas.width / 2);
+            hostConn.send({ type: 'input', angle: angle });
+          }
+        }, 1000 / 25);
+      });
+    }
+
+    function saveNick() {
+      const val = playerInput.value.trim();
+      playerName = val.length > 0 ? val : "You";
+      sessionStorage.setItem('paperball_player_name', playerName);
+      PALETTE[0].name = playerName;
+    }
+
+    function startSoloMatch() {
+      saveNick();
+      startScreen.style.display = 'none';
+      gameStarted = true;
+      matchStartTime = Date.now();
+      initGame(5);
+    }
+
+    function initGame(numBots = 5) {
+      worldGrid.fill(0);
+      gameOverScreen.style.display = 'none';
+      victoryScreen.style.display = 'none';
+      pauseScreen.style.display = 'none';
+      rematchPopup.style.display = 'none';
+      isPaused = false;
+      isGameOver = false;
+      isVictory = false;
+      playerKills = 0;
+      killsVal.textContent = '0';
+      matchStartTime = Date.now();
+
+      const initialSpawnRadius = 750;
+      players = [];
+
+      const activeHumanCount = isHost ? (1 + guestConnections.length) : 2;
+      const totalCount = Math.min(6, activeHumanCount + numBots);
+
+      for (let i = 0; i < totalCount; i++) {
+        const angle = (i * 2 * Math.PI) / totalCount;
+        const pos = {
+          x: WORLD_SIZE / 2 + Math.cos(angle) * initialSpawnRadius,
+          y: WORLD_SIZE / 2 + Math.sin(angle) * initialSpawnRadius
+        };
+
+        const isHumanGuest = isHost && (i >= 1 && i < activeHumanCount);
+        const isBot = isHost ? (i >= activeHumanCount) : (i + 1 !== myPlayerId);
+
+        players.push(new Character(PALETTE[i], isBot, pos, isHumanGuest));
+      }
+      
+      const myChar = players.find(p => p.id === myPlayerId);
+      if (myChar) myChar.speed = playerSpeedSetting;
+    }
+
+    function revivePlayer() {
+      if (isHost) {
+        const p = players.find(pl => pl.id === myPlayerId);
+        if (p && p.respawn()) {
+          p.speed = playerSpeedSetting;
+          gameOverScreen.style.display = 'none';
+          isGameOver = false;
+          broadcastTerritoryUpdate();
+        } else {
+          deathTitle.textContent = "NO SAFE SPACE AVAILABLE!";
+          deathStat.textContent = "The arena is occupied. Start a New Match.";
+          reviveBtn.style.display = 'none';
+        }
+      } else if (hostConn && hostConn.open) {
+        hostConn.send({ type: 'request_revive' });
+      }
+    }
+
+    function endGame() {
+      isGameOver = true;
+      deathTitle.textContent = "YOU WERE ELIMINATED!";
+      deathStat.textContent = `Final territory: ${scoreVal.textContent} | Total Kills: ${playerKills}`;
+      reviveBtn.style.display = 'inline-block';
+      gameOverScreen.style.display = 'flex';
+    }
+
+    function triggerVictory(txt) {
+      isVictory = true;
+      victoryStat.textContent = txt;
+      rematchBtn.style.display = isHost ? 'inline-block' : 'none';
+      victoryScreen.style.display = 'flex';
+    }
+
+    function checkOpponentLeftVictory() {
+      if (!isHost || isVictory || !gameStarted) return;
+      
+      let aliveOpponents = players.filter(p => p.id !== myPlayerId && (p.alive || !p.isPermanentlyDead));
+      let connectedGuests = guestConnections.length;
+      
+      if (connectedGuests === 0 && aliveOpponents.length === 0) {
+        let me = players.find(p => p.id === myPlayerId);
+        if (me && me.alive) {
+          triggerVictory("Opponent left the match! You won!");
+        }
+      } else if (connectedGuests === 1 && aliveOpponents.length === 0) {
+        let remainingGuest = guestConnections[0];
+        if (remainingGuest && remainingGuest.conn.open) {
+          remainingGuest.conn.send({ type: 'force_victory', msg: "Opponent left the match! You won!" });
+        }
+      }
+    }
+
+    function loop() {
+      resize();
+
+      if (!isPaused && gameStarted && !isVictory) {
+        if (isHost) {
+          players.forEach(p => p.update());
+
+          if (Date.now() - matchStartTime > 8000) {
+            let safeSpotAvailable = (findSafeSpawnPoint() !== null);
+            let anyBotAlive = players.some(p => p.isBot && p.alive);
+            let anyGuestAlive = guestConnections.some(g => {
+              let gp = players.find(pl => pl.id === g.playerId);
+              return gp && gp.alive;
+            });
+
+            if (!safeSpotAvailable && !anyBotAlive && !anyGuestAlive) {
+              let me = players.find(p => p.id === myPlayerId);
+              if (me && me.alive) {
+                triggerVictory("No safe space left for opponents! You won!");
+              }
+            }
+          }
+
+          if (guestConnections.length > 0) {
+            const syncData = {
+              type: 'sync',
+              players: players.map(p => ({
+                id: p.id, x: p.x, y: p.y, angle: p.angle, alive: p.alive, trail: p.trail
+              }))
+            };
+            guestConnections.forEach(g => {
+              if (g.conn.open) g.conn.send(syncData);
+            });
+          }
+        } else {
+          const myChar = players.find(p => p.id === myPlayerId);
+          if (myChar) myChar.update();
+        }
+      }
+
+      const localChar = players.find(p => p.id === myPlayerId) || players[0];
+      if (localChar && localChar.alive && !isNaN(localChar.x) && !isNaN(localChar.y)) {
+        lastCamPos.x = localChar.x;
+        lastCamPos.y = localChar.y;
+      }
+      const camX = lastCamPos.x;
+      const camY = lastCamPos.y;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2 - camX, canvas.height / 2 - camY);
+
+      // Arena
+      ctx.beginPath();
+      ctx.arc(WORLD_SIZE / 2, WORLD_SIZE / 2, WORLD_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = "#1e242c";
+      ctx.fill();
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = "#ff4757";
+      ctx.stroke();
+
+      // Teritorii
+      const cellCounts = [0, 0, 0, 0, 0, 0, 0];
+      for (let gy = 0; gy < GRID_RES; gy++) {
+        for (let gx = 0; gx < GRID_RES; gx++) {
+          const val = getCell(gx, gy);
+          if (val > 0 && val <= 6) {
+            cellCounts[val]++;
+            ctx.fillStyle = PALETTE[val - 1].zone;
+            ctx.fillRect(gx * CELL_PIXELS, gy * CELL_PIXELS, CELL_PIXELS + 0.5, CELL_PIXELS + 0.5);
+          }
+        }
+      }
+
+      if (isHost) {
+        players.forEach(p => {
+          if (p.alive && cellCounts[p.id] === 0) p.kill(null, false);
+        });
+      }
+
+      // Dâre
+      players.forEach(p => {
+        if (p.trail && p.trail.length > 0) {
+          ctx.beginPath();
+          ctx.moveTo(p.trail[0].x, p.trail[0].y);
+          for (let i = 1; i < p.trail.length; i++) ctx.lineTo(p.trail[i].x, p.trail[i].y);
+          ctx.lineTo(p.x, p.y);
+          ctx.strokeStyle = p.trailColor || PALETTE[p.id - 1].trail;
+          ctx.lineWidth = 11;
+          ctx.lineCap = "round";
+          ctx.stroke();
+        }
+      });
+
+      // Cuburi
+      players.forEach(p => {
+        if (!p.alive) return;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = p.headColor || PALETTE[p.id - 1].head;
+        ctx.beginPath();
+        ctx.roundRect(-p.radius, -p.radius, p.radius * 2, p.radius * 2, 7);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      ctx.restore();
+
+      // Leaderboard
+      let leaderboardData = [];
+
+      players.forEach(p => {
+        let pct = ((cellCounts[p.id] / TOTAL_ARENA_CELLS) * 100).toFixed(1);
+        if (p.id === myPlayerId) {
+          scoreVal.textContent = pct + "%";
+          if (parseFloat(pct) >= 100.0 && !isVictory && !isGameOver) {
+            triggerVictory("You conquered 100% of the arena!");
+          }
+        }
+
+        leaderboardData.push({
+          name: p.name + (!p.alive ? " (Dead)" : ""),
+          score: parseFloat(pct),
+          color: p.zoneColor,
+          alive: p.alive
+        });
+      });
+
+      leaderboardData.sort((a, b) => b.score - a.score);
+      lbRows.innerHTML = leaderboardData.map(d => `
+        <div class="lb-row" style="color:${d.alive ? d.color : '#6e7681'}">
+          <span>${d.name}</span><span>${d.score}%</span>
+        </div>
+      `).join('');
+
+      drawMinimap();
+      requestAnimationFrame(loop);
+    }
+
+    function drawMinimap() {
+      const mapSize = 156, margin = 20;
+      ctx.save();
+      ctx.translate(margin, canvas.height - mapSize - margin);
+
+      ctx.beginPath();
+      ctx.arc(mapSize / 2, mapSize / 2, mapSize / 2, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(13, 17, 23, 0.9)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.clip();
+
+      const scale = mapSize / WORLD_SIZE;
+      const miniCell = (WORLD_SIZE / GRID_RES) * scale;
+      for (let gy = 0; gy < GRID_RES; gy += 2) {
+        for (let gx = 0; gx < GRID_RES; gx += 2) {
+          const val = getCell(gx, gy);
+          if (val > 0 && val <= 6) {
+            ctx.fillStyle = PALETTE[val - 1].zone;
+            ctx.fillRect(gx * miniCell, gy * miniCell, miniCell * 2, miniCell * 2);
+          }
+        }
+      }
+      players.forEach(p => {
+        if (!p.alive) return;
+        ctx.beginPath();
+        ctx.arc(p.x * scale, p.y * scale, p.id === myPlayerId ? 5 : 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = p.zoneColor;
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinRoomId = urlParams.get('join');
+    if (joinRoomId) {
+      setupGuestJoinFlow(joinRoomId);
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
