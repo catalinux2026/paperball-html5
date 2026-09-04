@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Paper Ball v1.6</title>
+  <title>Paper Ball v1.7</title>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
@@ -342,7 +342,7 @@
 
   <!-- Start Menu -->
   <div id="start-screen" class="modal-screen" style="display: flex;">
-    <h1 style="color: #58a6ff; margin-bottom: 24px;">Paper Ball v1.6</h1>
+    <h1 style="color: #58a6ff; margin-bottom: 24px;">Paper Ball v1.7</h1>
     <input type="text" id="player-input" class="input-field" maxlength="14" placeholder="Your Nickname..." />
     
     <div class="btn-container">
@@ -400,7 +400,7 @@
     <button id="start-match-btn" class="btn-action" style="background:#0969da; margin-top: 10px;" onclick="launchMultiplayerMatch()">Start Match</button>
   </div>
 
-  <!-- Game Over Screen (Respawn strict manual) -->
+  <!-- Game Over Screen -->
   <div id="game-over-screen" class="modal-screen">
     <h1 id="death-title" style="color: #ff4757;">YOU WERE ELIMINATED!</h1>
     <p id="death-stat">Respawn ready in: 5s</p>
@@ -784,25 +784,38 @@
       }
     }
 
+    // Curatare teritorii deconectate FARA sa ucida jucatorul daca e afara
     function pruneDisconnectedTerritory(ownerId, targetX, targetY) {
       let visited = new Uint8Array(GRID_RES * GRID_RES);
       const { gx, gy } = worldToGrid(targetX, targetY);
       let queue = [];
 
+      let startX = -1, startY = -1;
       if (getCell(gx, gy) === ownerId) {
-        queue.push(gx, gy); 
-        visited[gy * GRID_RES + gx] = 1;
+        startX = gx; startY = gy;
+      } else {
+        for (let y = 0; y < GRID_RES && startX === -1; y++) {
+          for (let x = 0; x < GRID_RES; x++) {
+            if (worldGrid[y * GRID_RES + x] === ownerId) {
+              startX = x; startY = y; break;
+            }
+          }
+        }
       }
 
-      while (queue.length > 0) {
-        let cy = queue.pop(), cx = queue.pop();
-        for (let [dx, dy] of [[1,0], [-1,0], [0,1], [0,-1]]) {
-          let nx = cx + dx, ny = cy + dy;
-          if (nx >= 0 && nx < GRID_RES && ny >= 0 && ny < GRID_RES) {
-            let idx = ny * GRID_RES + nx;
-            if (visited[idx] === 0 && worldGrid[idx] === ownerId) {
-              visited[idx] = 1; 
-              queue.push(nx, ny);
+      if (startX !== -1) {
+        queue.push(startX, startY);
+        visited[startY * GRID_RES + startX] = 1;
+        while (queue.length > 0) {
+          let cy = queue.pop(), cx = queue.pop();
+          for (let [dx, dy] of [[1,0], [-1,0], [0,1], [0,-1]]) {
+            let nx = cx + dx, ny = cy + dy;
+            if (nx >= 0 && nx < GRID_RES && ny >= 0 && ny < GRID_RES) {
+              let idx = ny * GRID_RES + nx;
+              if (visited[idx] === 0 && worldGrid[idx] === ownerId) {
+                visited[idx] = 1; 
+                queue.push(nx, ny);
+              }
             }
           }
         }
@@ -812,22 +825,6 @@
         if (worldGrid[i] === ownerId && visited[i] === 0) {
           worldGrid[i] = 0;
         }
-      }
-    }
-
-    function validatePlayerBaseConnection(victim, capturer) {
-      if (!victim || !victim.alive) return;
-
-      let hasAnyTerritory = false;
-      for (let i = 0; i < worldGrid.length; i++) {
-        if (worldGrid[i] === victim.id) {
-          hasAnyTerritory = true;
-          break;
-        }
-      }
-
-      if (!hasAnyTerritory) {
-        victim.kill(capturer, false);
       }
     }
 
@@ -952,6 +949,7 @@
           this.trail = [];
         }
 
+        // Coliziune doar la taierea darei
         players.forEach(p => {
           if (!p.alive || p === this) return;
           for (let i = 0; i < p.trail.length; i++) {
@@ -1071,7 +1069,13 @@
           const victim = players.find(p => p.id === vId);
           if (victim && victim.alive) {
             pruneDisconnectedTerritory(vId, victim.x, victim.y);
-            validatePlayerBaseConnection(victim, this);
+            let hasAny = false;
+            for (let k = 0; k < worldGrid.length; k++) {
+              if (worldGrid[k] === vId) { hasAny = true; break; }
+            }
+            if (!hasAny) {
+              victim.kill(this, false);
+            }
           }
         });
 
