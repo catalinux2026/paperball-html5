@@ -1,0 +1,23 @@
+{
+  "name": "paperball-html5",
+  "version": "1.7.0",
+  "description": "Paper Ball - A multiplayer HTML5 game",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"No tests specified\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/catalinux2026/paperball-html5.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/catalinux2026/paperball-html5/issues"
+  },
+  "homepage": "https://github.com/catalinux2026/paperball-html5#readme",
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  }
+}
